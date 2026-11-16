@@ -1,0 +1,124 @@
+import { loadConfig, type BotConfig } from "../config.ts";
+import { searchMl } from "../ml/search.ts";
+import { mlItemToDeal, pickDeals, type Deal } from "../ml/deals.ts";
+import { searchProductOffers } from "../shopee/api.ts";
+import { shopeeOfferToDeal } from "../shopee/deals.ts";
+import { sendMessage, sendPhoto } from "../telegram/client.ts";
+import { formatDealMessage } from "../telegram/format.ts";
+import { PostedDb } from "../store/db.ts";
+
+export interface RunStats {
+  found: number;
+  eligible: number;
+  posted: number;
+  skippedAlreadyPosted: number;
+  errors: string[];
+}
+
+async function collectMlDeals(config: BotConfig): Promise<Deal[]> {
+  if (!config.mlAffiliateTag) {
+    console.warn("[ml] ML_AFFILIATE_TAG não configurado — loja ML ignorada.");
+    return [];
+  }
+  const deals: Deal[] = [];
+  for (const keyword of config.keywords) {
+    try {
+      const items = await searchMl(keyword);
+      for (const item of items) {
+        const deal = mlItemToDeal(item, config.mlAffiliateTag, config.mlAffiliateLabel);
+        if (deal) deals.push(deal);
+      }
+    } catch (error) {
+      console.error(`[ml] busca "${keyword}" falhou:`, (error as Error).message);
+    }
+  }
+  return deals;
+}
+
+async function collectShopeeDeals(config: BotConfig): Promise<Deal[]> {
+  if (!config.shopeeAppId || !config.shopeeSecret) {
+    console.warn("[shopee] credenciais da API não configuradas — loja Shopee ignorada.");
+    return [];
+  }
+  const deals: Deal[] = [];
+  for (const keyword of config.keywords) {
+    try {
+      const offers = await searchProductOffers({
+        appId: config.shopeeAppId,
+        secret: config.shopeeSecret,
+        keyword,
+        sortType: 2, // mais vendidos
+        limit: 20,
+      });
+      for (const offer of offers) deals.push(shopeeOfferToDeal(offer));
+    } catch (error) {
+      console.error(`[shopee] busca "${keyword}" falhou:`, (error as Error).message);
+    }
+  }
+  return deals;
+}
+
+export async function runJob(config: BotConfig): Promise<RunStats> {
+  const stats: RunStats = { found: 0, eligible: 0, posted: 0, skippedAlreadyPosted: 0, errors: [] };
+  const db = new PostedDb(config.dataDir);
+  db.prune();
+
+  const found: Deal[] = [];
+  if (config.stores.includes("ml")) found.push(...(await collectMlDeals(config)));
+  if (config.stores.includes("shopee")) found.push(...(await collectShopeeDeals(config)));
+  stats.found = found.length;
+
+  const fresh = found.filter((d) => {
+    if (db.has(d.key)) {
+      stats.skippedAlreadyPosted += 1;
+      return false;
+    }
+    return true;
+  });
+  const picked = pickDeals(fresh, config.minDiscountPct, config.maxPostsPerRun);
+  stats.eligible = picked.length;
+
+  if (!config.dryRun && (!config.telegramBotToken || !config.telegramChatId)) {
+    throw new Error("TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID são obrigatórios (ou rode com --dry-run).");
+  }
+
+  for (const deal of picked) {
+    const text = formatDealMessage(deal);
+    if (config.dryRun) {
+      console.log(`--- DRY-RUN [${deal.store}] ${deal.key} ---`);
+      console.log(text);
+      console.log(`URL: ${deal.url}`);
+      stats.posted += 1;
+      continue;
+    }
+    try {
+      if (deal.imageUrl) {
+        await sendPhoto(config.telegramBotToken, config.telegramChatId, deal.imageUrl, text);
+      } else {
+        await sendMessage(config.telegramBotToken, config.telegramChatId, text);
+      }
+      db.mark(deal.key, deal.title);
+      stats.posted += 1;
+      // Intervalo entre posts para não parecer spam.
+      await new Promise((r) => setTimeout(r, 1500));
+    } catch (error) {
+      const message = `[${deal.key}] ${(error as Error).message}`;
+      console.error(message);
+      stats.errors.push(message);
+    }
+  }
+
+  db.save();
+  return stats;
+}
+
+export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
+  const config = loadConfig(argv);
+  if (config.keywords.length === 0) {
+    throw new Error("Configure DEAL_KEYWORDS (ex.: DEAL_KEYWORDS=capacete ciclismo,air fryer).");
+  }
+  const stats = await runJob(config);
+  console.log(
+    JSON.stringify({ dryRun: config.dryRun, ...stats, postedDbSize: new PostedDb(config.dataDir).size }),
+  );
+}
