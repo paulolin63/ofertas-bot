@@ -37,8 +37,17 @@ git push -u origin main
 
 ## 6. Segredos no GitHub (Settings → Secrets and variables → Actions)
 
-Secrets: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ML_AFFILIATE_TAG`, `SHOPEE_API_APP_ID`, `SHOPEE_API_SECRET`.
+Secrets: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ML_AFFILIATE_TAG`, `ML_CLIENT_ID`, `ML_CLIENT_SECRET`, `SHOPEE_API_APP_ID`, `SHOPEE_API_SECRET`.
 Variables (opcional): `DEAL_KEYWORDS`, `DEAL_MIN_DISCOUNT_PCT`, `DEAL_MAX_POSTS_PER_RUN`, `DEAL_STORES`, `ML_AFFILIATE_LABEL`.
+
+### Aplicação do ML (ML_CLIENT_ID / ML_CLIENT_SECRET)
+
+A busca pública do ML devolve 403 em IPs de datacenter — testado na VM e nos runners do GitHub (2026-11-16). A tentativa B é buscar autenticado:
+
+1. Em [developers.mercadolivre.com.br](https://developers.mercadolivre.com.br/), logado na sua conta do ML, crie uma aplicação `ofertas-bot` (Redirect URL: `https://localhost:8080/callback`; scopes: read + offline_access).
+2. Anote o Client ID e o Secret Key e guarde-os como secrets `ML_CLIENT_ID` / `ML_CLIENT_SECRET` no repositório.
+3. Cada execução do bot emite um access_token (client_credentials, válido 6h) e o envia como Bearer na busca — ver `src/ml/auth.ts`.
+4. Se o log mostrar que o token foi emitido mas a busca continua 403, a tentativa B falhou: o plano C é buscar as ofertas pelo navegador (que abre o ML normalmente) em vez da API.
 
 ## 7. Testar antes de automatizar
 
