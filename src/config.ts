@@ -6,6 +6,8 @@ export interface BotConfig {
   telegramChatId: string;
   mlAffiliateTag: string;
   mlAffiliateLabel: string;
+  mlClientId: string;
+  mlClientSecret: string;
   shopeeAppId: string;
   shopeeSecret: string;
   keywords: string[];
@@ -68,6 +70,8 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): BotConfig {
     telegramChatId: env.TELEGRAM_CHAT_ID ?? "",
     mlAffiliateTag: env.ML_AFFILIATE_TAG ?? "",
     mlAffiliateLabel: env.ML_AFFILIATE_LABEL ?? "ofertas-bot",
+    mlClientId: env.ML_CLIENT_ID ?? "",
+    mlClientSecret: env.ML_CLIENT_SECRET ?? "",
     shopeeAppId: env.SHOPEE_API_APP_ID ?? "",
     shopeeSecret: env.SHOPEE_API_SECRET ?? "",
     keywords,
