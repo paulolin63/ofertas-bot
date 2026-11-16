@@ -4,7 +4,7 @@ Bot de ofertas para Telegram: busca promoções no **Mercado Livre** e na **Shop
 
 ## Como funciona
 
-1. **Busca**: ML via API pública de sites (`api.mercadolibre.com/sites/MLB/search`); Shopee via Affiliate Open API GraphQL (`productOfferV2`).
+1. **Busca**: ML via API pública de sites (`api.mercadolibre.com/sites/MLB/search`), autenticada com um access_token emitido por execução (client_credentials) — a busca sem auth devolve 403 em IPs de datacenter, testado na VM e nos runners do GitHub (2026-11-16); Shopee via Affiliate Open API GraphQL (`productOfferV2`).
 2. **Filtro**: só entra oferta com desconto ≥ `DEAL_MIN_DISCOUNT_PCT` (padrão 20%), produto novo (ML), e que ainda não foi postada (`data/posted.json`).
 3. **Link de afiliado**: ML — anexa a sua etiqueta (`matt_tool`); Shopee — usa o `offerLink` que a própria API devolve.
 4. **Post**: foto + legenda no Telegram via Bot API, com selo "Link de afiliado".
@@ -26,6 +26,7 @@ npm start              # executa e posta de verdade
 | `TELEGRAM_CHAT_ID` | sim | `@seu_canal` ou ID `-100...` do canal/grupo |
 | `ML_AFFILIATE_TAG` | p/ ML | Sua etiqueta de afiliado (`matt_tool`) |
 | `ML_AFFILIATE_LABEL` | não | Rótulo de tracking (`matt_word`, padrão `ofertas-bot`) |
+| `ML_CLIENT_ID` / `ML_CLIENT_SECRET` | p/ ML | Credenciais da aplicação em developers.mercadolivre.com.br (token por execução) |
 | `SHOPEE_API_APP_ID` / `SHOPEE_API_SECRET` | p/ Shopee | Credenciais da Affiliate Open API |
 | `DEAL_KEYWORDS` | sim | Palavras-chave separadas por vírgula |
 | `DEAL_MIN_DISCOUNT_PCT` | não | Desconto mínimo (padrão 20) |
