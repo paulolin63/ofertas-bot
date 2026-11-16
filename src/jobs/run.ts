@@ -1,4 +1,5 @@
 import { loadConfig, type BotConfig } from "../config.ts";
+import { getClientCredentialsToken } from "../ml/auth.ts";
 import { searchMl } from "../ml/search.ts";
 import { mlItemToDeal, pickDeals, type Deal } from "../ml/deals.ts";
 import { searchProductOffers } from "../shopee/api.ts";
@@ -20,10 +21,23 @@ async function collectMlDeals(config: BotConfig): Promise<Deal[]> {
     console.warn("[ml] ML_AFFILIATE_TAG não configurado — loja ML ignorada.");
     return [];
   }
+  // Tentativa B: emitir um token client_credentials e buscar autenticado.
+  // Se falhar, segue sem token (a busca pode devolver 403 em datacenter).
+  let accessToken: string | undefined;
+  if (config.mlClientId && config.mlClientSecret) {
+    try {
+      accessToken = await getClientCredentialsToken(config.mlClientId, config.mlClientSecret);
+      console.log("[ml] token client_credentials emitido.");
+    } catch (error) {
+      console.error("[ml] token client_credentials falhou:", (error as Error).message);
+    }
+  } else {
+    console.warn("[ml] ML_CLIENT_ID/ML_CLIENT_SECRET não configurados — busca sem autenticação.");
+  }
   const deals: Deal[] = [];
   for (const keyword of config.keywords) {
     try {
-      const items = await searchMl(keyword);
+      const items = await searchMl(keyword, 50, fetch, accessToken);
       for (const item of items) {
         const deal = mlItemToDeal(item, config.mlAffiliateTag, config.mlAffiliateLabel);
         if (deal) deals.push(deal);
