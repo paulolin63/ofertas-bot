@@ -1,12 +1,15 @@
 # Bot de ofertas — execução agendada (sem servidor).
 #
-# Por que GitHub Actions e não a VM: a API pública do Mercado Livre bloqueia
-# o IP da VM (403 + captcha no site). O runner do GitHub usa outro egress.
-# Se um dia o ML passar a bloquear o runner também, o job da Shopee continua
+# A API pública do Mercado Livre bloqueia IPs de datacenter: 403 nesta VM e
+# também nos runners do GitHub Actions (testado 2026-11-16, 5/5 keywords).
+# Tentativa B (em teste): cada execução emite um access_token via
+# client_credentials (ML_CLIENT_ID/ML_CLIENT_SECRET) e busca autenticada —
+# ver src/ml/auth.ts. Se não destravar, o job da Shopee continua
 # funcionando (a API da Shopee responde normalmente de qualquer lugar).
 #
 # Segredos necessários no repositório (Settings → Secrets → Actions):
 #   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, ML_AFFILIATE_TAG,
+#   ML_CLIENT_ID, ML_CLIENT_SECRET,
 #   SHOPEE_API_APP_ID, SHOPEE_API_SECRET
 # Opcional (com defaults no .env.example): DEAL_KEYWORDS, DEAL_MIN_DISCOUNT_PCT,
 # DEAL_MAX_POSTS_PER_RUN, DEAL_STORES, ML_AFFILIATE_LABEL.
@@ -39,6 +42,8 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           ML_AFFILIATE_TAG: ${{ secrets.ML_AFFILIATE_TAG }}
           ML_AFFILIATE_LABEL: ${{ vars.ML_AFFILIATE_LABEL }}
+          ML_CLIENT_ID: ${{ secrets.ML_CLIENT_ID }}
+          ML_CLIENT_SECRET: ${{ secrets.ML_CLIENT_SECRET }}
           SHOPEE_API_APP_ID: ${{ secrets.SHOPEE_API_APP_ID }}
           SHOPEE_API_SECRET: ${{ secrets.SHOPEE_API_SECRET }}
           DEAL_KEYWORDS: ${{ vars.DEAL_KEYWORDS }}
