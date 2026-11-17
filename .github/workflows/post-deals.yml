@@ -10,7 +10,13 @@
 # Segredos necessários no repositório (Settings → Secrets → Actions):
 #   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, ML_AFFILIATE_TAG,
 #   ML_CLIENT_ID, ML_CLIENT_SECRET,
-#   SHOPEE_API_APP_ID, SHOPEE_API_SECRET
+#   SHOPEE_API_APP_ID, SHOPEE_API_SECRET,
+#   AMAZON_AFFILIATE_TAG (ex.: lin63-20)
+# Amazon — plano B: ofertas da lista curada em data/amazon-deals.json
+# (conferida no navegador); o bot só anexa ?tag= a cada link.
+# Brindes grátis (Epic + GamerPower, em PT-BR):
+#   FREEBIE_SOURCES, FREEBIE_MAX_PER_RUN (vars),
+#   MYMEMORY_EMAIL (secret, opcional — tradução EN→PT-BR).
 # Opcional (com defaults no .env.example): DEAL_KEYWORDS, DEAL_MIN_DISCOUNT_PCT,
 # DEAL_MAX_POSTS_PER_RUN, DEAL_STORES, ML_AFFILIATE_LABEL.
 #
@@ -46,6 +52,10 @@ jobs:
           ML_CLIENT_SECRET: ${{ secrets.ML_CLIENT_SECRET }}
           SHOPEE_API_APP_ID: ${{ secrets.SHOPEE_API_APP_ID }}
           SHOPEE_API_SECRET: ${{ secrets.SHOPEE_API_SECRET }}
+          AMAZON_AFFILIATE_TAG: ${{ secrets.AMAZON_AFFILIATE_TAG }}
+          FREEBIE_SOURCES: ${{ vars.FREEBIE_SOURCES }}
+          FREEBIE_MAX_PER_RUN: ${{ vars.FREEBIE_MAX_PER_RUN }}
+          MYMEMORY_EMAIL: ${{ secrets.MYMEMORY_EMAIL }}
           DEAL_KEYWORDS: ${{ vars.DEAL_KEYWORDS }}
           DEAL_MIN_DISCOUNT_PCT: ${{ vars.DEAL_MIN_DISCOUNT_PCT }}
           DEAL_MAX_POSTS_PER_RUN: ${{ vars.DEAL_MAX_POSTS_PER_RUN }}
