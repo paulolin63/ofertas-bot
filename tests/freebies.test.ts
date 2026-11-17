@@ -179,11 +179,11 @@ test("collectFreebies: epic entra direto, gamerpower traduzido", async () => {
   };
   const gpBody = [
     {
-      id: 3850,
-      title: "Knightica Giveaway",
-      worth: "$14.99",
+      id: 3346,
+      title: "My Darkest Witch (IndieGala) Giveaway",
+      worth: "$4.99",
       description: "Score it for free!",
-      open_giveaway_url: "https://www.gamerpower.com/open/knightica",
+      open_giveaway_url: "https://www.gamerpower.com/open/witch",
       end_date: "2026-11-19 23:59:00",
       status: "Active",
     },
@@ -208,7 +208,79 @@ test("collectFreebies: epic entra direto, gamerpower traduzido", async () => {
   assert.equal(freebies[0].source, "epic");
   assert.equal(freebies[0].title, "Knightica");
   assert.equal(freebies[1].source, "gamerpower");
-  assert.ok(freebies[1].title.startsWith("[PT]"));
+  assert.ok(freebies[1].title.startsWith("[PT] My Darkest Witch"));
+});
+
+test("collectFreebies: mesmo jogo nas duas fontes posta só pela Epic", async () => {
+  const epicBody = {
+    data: {
+      Catalog: {
+        searchStore: {
+          elements: [
+            {
+              title: "Knightica",
+              description: "Um roguelike tático.",
+              productSlug: "knightica",
+              price: { totalPrice: { fmtPrice: { originalPrice: "R$ 39,99" } } },
+              promotions: {
+                promotionalOffers: [
+                  {
+                    promotionalOffers: [
+                      {
+                        startDate: "2026-11-12T16:00:00.000Z",
+                        endDate: "2026-11-19T16:00:00.000Z",
+                        discountSetting: { discountPercentage: 0 },
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    },
+  };
+  const gpBody = [
+    {
+      id: 3850,
+      title: "Knightica (Epic Games) Giveaway",
+      worth: "$14.99",
+      description: "Score it for free!",
+      open_giveaway_url: "https://www.gamerpower.com/open/knightica",
+      end_date: "2026-11-19 23:59:00",
+      status: "Active",
+    },
+    {
+      id: 3346,
+      title: "My Darkest Witch (IndieGala) Giveaway",
+      worth: "$4.99",
+      description: "Score it for free!",
+      open_giveaway_url: "https://www.gamerpower.com/open/witch",
+      end_date: "2026-11-19 23:59:00",
+      status: "Active",
+    },
+  ];
+  const fetchFn = (async (url: string) => {
+    if (url.includes("epicgames")) return new Response(JSON.stringify(epicBody));
+    if (url.includes("gamerpower")) return new Response(JSON.stringify(gpBody));
+    const q = new URL(url).searchParams.get("q") ?? "";
+    return new Response(
+      JSON.stringify({ responseData: { translatedText: `[PT] ${q}` } }),
+    );
+  }) as unknown as typeof fetch;
+
+  const { freebies, errors } = await collectFreebies(
+    { sources: ["epic", "gamerpower"], maxPerRun: 5, myMemoryEmail: "" },
+    fetchFn,
+    NOW,
+  );
+  assert.deepEqual(errors, []);
+  // Knightica do GamerPower é descartado (duplicado da Epic); a bruxa fica.
+  assert.deepEqual(
+    freebies.map((f) => f.key),
+    ["freebie:epic:https://store.epicgames.com/pt-BR/p/knightica", "freebie:gp:3346"],
+  );
 });
 
 test("collectFreebies: tradução falhou pula o item e registra o erro", async () => {
