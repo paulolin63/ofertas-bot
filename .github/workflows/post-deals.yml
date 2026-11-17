@@ -30,6 +30,11 @@ on:
     # 10h, 13h, 16h e 19h em BRT (UTC-3) — 13, 16, 19, 22 UTC
     - cron: "0 13,16,19,22 * * *"
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry-run (não posta, só mostra o que seria postado)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -60,7 +65,7 @@ jobs:
           DEAL_MIN_DISCOUNT_PCT: ${{ vars.DEAL_MIN_DISCOUNT_PCT }}
           DEAL_MAX_POSTS_PER_RUN: ${{ vars.DEAL_MAX_POSTS_PER_RUN }}
           DEAL_STORES: ${{ vars.DEAL_STORES }}
-        run: node src/index.ts
+        run: node src/index.ts $([ "${{ inputs.dry_run }}" = "true" ] && echo --dry-run)
       - name: Persist posted history
         run: |
           git config user.name "ofertas-bot"
