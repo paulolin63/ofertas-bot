@@ -10,10 +10,14 @@ export interface BotConfig {
   mlClientSecret: string;
   shopeeAppId: string;
   shopeeSecret: string;
+  amazonAffiliateTag: string;
+  freebieSources: Array<"epic" | "gamerpower">;
+  freebieMaxPerRun: number;
+  myMemoryEmail: string;
   keywords: string[];
   minDiscountPct: number;
   maxPostsPerRun: number;
-  stores: Array<"ml" | "shopee">;
+  stores: Array<"ml" | "shopee" | "amazon">;
   dataDir: string;
   dryRun: boolean;
 }
@@ -50,10 +54,12 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): BotConfig {
   const args = parseArgs(argv);
   const env = process.env;
 
-  const storesRaw = (args.stores ?? env.DEAL_STORES ?? "ml,shopee")
+  const storesRaw = (args.stores ?? env.DEAL_STORES ?? "ml,shopee,amazon")
     .split(",")
     .map((s) => s.trim().toLowerCase())
-    .filter((s) => s === "ml" || s === "shopee") as Array<"ml" | "shopee">;
+    .filter((s) => s === "ml" || s === "shopee" || s === "amazon") as Array<
+    "ml" | "shopee" | "amazon"
+  >;
 
   const keywordsRaw = (env.DEAL_KEYWORDS ?? "")
     .split(",")
@@ -65,6 +71,11 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): BotConfig {
       ? keywordsRaw
       : ["capacete ciclismo", "tenis corrida", "garmin", "air fryer", "fone bluetooth"];
 
+  const freebieSourcesRaw = (env.FREEBIE_SOURCES ?? "epic,gamerpower")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s === "epic" || s === "gamerpower") as Array<"epic" | "gamerpower">;
+
   return {
     telegramBotToken: env.TELEGRAM_BOT_TOKEN ?? "",
     telegramChatId: env.TELEGRAM_CHAT_ID ?? "",
@@ -74,10 +85,14 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): BotConfig {
     mlClientSecret: env.ML_CLIENT_SECRET ?? "",
     shopeeAppId: env.SHOPEE_API_APP_ID ?? "",
     shopeeSecret: env.SHOPEE_API_SECRET ?? "",
+    amazonAffiliateTag: env.AMAZON_AFFILIATE_TAG ?? "",
+    freebieSources: freebieSourcesRaw.length > 0 ? freebieSourcesRaw : ["epic", "gamerpower"],
+    freebieMaxPerRun: Number(env.FREEBIE_MAX_PER_RUN ?? 3),
+    myMemoryEmail: env.MYMEMORY_EMAIL ?? "",
     keywords,
     minDiscountPct: Number(env.DEAL_MIN_DISCOUNT_PCT ?? 20),
     maxPostsPerRun: args.max ?? Number(env.DEAL_MAX_POSTS_PER_RUN ?? 5),
-    stores: storesRaw.length > 0 ? storesRaw : ["ml", "shopee"],
+    stores: storesRaw.length > 0 ? storesRaw : ["ml", "shopee", "amazon"],
     dataDir: env.DATA_DIR ?? "./data",
     dryRun: args.dryRun,
   };
