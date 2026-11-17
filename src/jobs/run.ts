@@ -8,6 +8,7 @@ import { loadAmazonSeedDeals } from "../amazon/deals.ts";
 import {
   collectFreebies,
   formatFreebieMessage,
+  type Freebie,
 } from "../freebies/freebie.ts";
 import { sendMessage, sendPhoto } from "../telegram/client.ts";
 import { formatDealMessage } from "../telegram/format.ts";
@@ -119,6 +120,17 @@ export async function runJob(config: BotConfig): Promise<RunStats> {
   const picked = pickDeals(fresh, config.minDiscountPct, config.maxPostsPerRun);
   stats.eligible = picked.length;
 
+  // Brindes: a coleta acontece ANTES da checagem do token, para o log
+  // mostrar o que foi encontrado mesmo sem token (o post em si continua
+  // exigindo o token — sem ele, a execução falha aqui, como esperado).
+  const { freebies, errors: freebieErrors } = await collectFreebies({
+    sources: config.freebieSources,
+    maxPerRun: config.freebieMaxPerRun,
+    myMemoryEmail: config.myMemoryEmail,
+  });
+  stats.errors.push(...freebieErrors);
+  stats.freebiesFound = freebies.length;
+
   if (!config.dryRun && (!config.telegramBotToken || !config.telegramChatId)) {
     throw new Error("TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID são obrigatórios (ou rode com --dry-run).");
   }
@@ -150,7 +162,7 @@ export async function runJob(config: BotConfig): Promise<RunStats> {
   }
 
   // Brindes grátis (Epic + GamerPower, em PT-BR) — depois das ofertas.
-  await publishFreebies(config, db, stats);
+  await publishFreebies(config, db, stats, freebies);
 
   db.save();
   return stats;
@@ -160,15 +172,8 @@ async function publishFreebies(
   config: BotConfig,
   db: PostedDb,
   stats: RunStats,
+  freebies: Freebie[],
 ): Promise<void> {
-  const { freebies, errors } = await collectFreebies({
-    sources: config.freebieSources,
-    maxPerRun: config.freebieMaxPerRun,
-    myMemoryEmail: config.myMemoryEmail,
-  });
-  stats.errors.push(...errors);
-  stats.freebiesFound = freebies.length;
-
   const fresh = freebies.filter((f) => {
     if (db.has(f.key)) {
       stats.skippedAlreadyPosted += 1;
