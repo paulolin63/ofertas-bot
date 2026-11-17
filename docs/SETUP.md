@@ -15,6 +15,13 @@
 
 No portal do Afiliado Shopee → acesso à API: anote `app_id` e `secret_key`. A liberação pode levar até 2 semanas. **Sem isso, rode só com ML** (`DEAL_STORES=ml`) e ligue a Shopee depois.
 
+## 3b. Amazon — plano B (lista curada, sem PA-API)
+
+1. No portal do Associates, confirme o seu tracking ID (o mesmo do Peleia é `lin63-20`) e guarde-o como secret `AMAZON_AFFILIATE_TAG`.
+2. As ofertas ficam em `data/amazon-deals.json`: cada item tem `asin`, `title`, `price`, `originalPrice` e `imageUrl` opcional. O formato aceita um array direto ou `{ "checkedAt": "2026-11-17", "deals": [...] }`.
+3. **Como refrescar**: no navegador, abra a amazon.com.br, busque as palavras-chave do bot e anote os produtos com desconto real (preço "de" riscado ≥ 20%). O ASIN é o código de 10 caracteres na URL (`/dp/B0...`). Substitua os itens do arquivo e commite.
+4. Plano A (futuro): Product Advertising API 5.0 — em Associates Central → Tools → Product Advertising API, crie Access Key + Secret Key. Exige 3 vendas qualificadas em 180 dias para devolver dados; as chaves levam 48–72 h para ativar.
+
 ## 4. Validar o link de afiliado do ML (obrigatório antes de ir ao ar)
 
 O bot anexa a sua etiqueta (`matt_tool`) ao permalink do produto. Antes de automatizar, confirme que esse é mesmo o mecanismo:
@@ -37,7 +44,7 @@ git push -u origin main
 
 ## 6. Segredos no GitHub (Settings → Secrets and variables → Actions)
 
-Secrets: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ML_AFFILIATE_TAG`, `ML_CLIENT_ID`, `ML_CLIENT_SECRET`, `SHOPEE_API_APP_ID`, `SHOPEE_API_SECRET`.
+Secrets: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ML_AFFILIATE_TAG`, `ML_CLIENT_ID`, `ML_CLIENT_SECRET`, `SHOPEE_API_APP_ID`, `SHOPEE_API_SECRET`, `AMAZON_AFFILIATE_TAG`.
 Variables (opcional): `DEAL_KEYWORDS`, `DEAL_MIN_DISCOUNT_PCT`, `DEAL_MAX_POSTS_PER_RUN`, `DEAL_STORES`, `ML_AFFILIATE_LABEL`.
 
 ### Aplicação do ML (ML_CLIENT_ID / ML_CLIENT_SECRET)
