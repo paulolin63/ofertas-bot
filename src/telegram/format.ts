@@ -15,6 +15,7 @@ function truncate(text: string, max: number): string {
 const STORE_LABEL: Record<Deal["store"], string> = {
   ml: "Mercado Livre",
   shopee: "Shopee",
+  amazon: "Amazon",
 };
 
 /**
