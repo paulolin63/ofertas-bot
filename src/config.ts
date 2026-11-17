@@ -76,24 +76,43 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): BotConfig {
     .map((s) => s.trim().toLowerCase())
     .filter((s) => s === "epic" || s === "gamerpower") as Array<"epic" | "gamerpower">;
 
+  // Variável de ambiente vazia ("") NÃO é null/undefined, então `??`
+  // não cai no padrão — e Number("") é 0. No GitHub Actions, um
+  // `${{ vars.X }}` sem variável definida chega como string vazia; sem
+  // este tratamento, FREEBIE_MAX_PER_RUN="" zerava os brindes (run #3,
+  // 2026-11-17: freebiesFound 0 sem erro). Vazio ou inválido → padrão.
+  const num = (name: string, fallback: number): number => {
+    const raw = env[name]?.trim();
+    if (!raw) return fallback;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : fallback;
+  };
+  const str = (name: string, fallback: string): string => {
+    const raw = env[name]?.trim();
+    return raw ? raw : fallback;
+  };
+
   return {
     telegramBotToken: env.TELEGRAM_BOT_TOKEN ?? "",
     telegramChatId: env.TELEGRAM_CHAT_ID ?? "",
     mlAffiliateTag: env.ML_AFFILIATE_TAG ?? "",
-    mlAffiliateLabel: env.ML_AFFILIATE_LABEL ?? "ofertas-bot",
+    mlAffiliateLabel: str("ML_AFFILIATE_LABEL", "ofertas-bot"),
     mlClientId: env.ML_CLIENT_ID ?? "",
     mlClientSecret: env.ML_CLIENT_SECRET ?? "",
     shopeeAppId: env.SHOPEE_API_APP_ID ?? "",
     shopeeSecret: env.SHOPEE_API_SECRET ?? "",
     amazonAffiliateTag: env.AMAZON_AFFILIATE_TAG ?? "",
     freebieSources: freebieSourcesRaw.length > 0 ? freebieSourcesRaw : ["epic", "gamerpower"],
-    freebieMaxPerRun: Number(env.FREEBIE_MAX_PER_RUN ?? 3),
+    freebieMaxPerRun: num("FREEBIE_MAX_PER_RUN", 3),
     myMemoryEmail: env.MYMEMORY_EMAIL ?? "",
     keywords,
-    minDiscountPct: Number(env.DEAL_MIN_DISCOUNT_PCT ?? 20),
-    maxPostsPerRun: args.max ?? Number(env.DEAL_MAX_POSTS_PER_RUN ?? 5),
+    minDiscountPct: num("DEAL_MIN_DISCOUNT_PCT", 20),
+    maxPostsPerRun:
+      args.max !== undefined && Number.isFinite(args.max)
+        ? args.max
+        : num("DEAL_MAX_POSTS_PER_RUN", 5),
     stores: storesRaw.length > 0 ? storesRaw : ["ml", "shopee", "amazon"],
-    dataDir: env.DATA_DIR ?? "./data",
+    dataDir: str("DATA_DIR", "./data"),
     dryRun: args.dryRun,
   };
 }
