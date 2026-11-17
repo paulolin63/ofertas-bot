@@ -4,6 +4,11 @@ import { searchMl } from "../ml/search.ts";
 import { mlItemToDeal, pickDeals, type Deal } from "../ml/deals.ts";
 import { searchProductOffers } from "../shopee/api.ts";
 import { shopeeOfferToDeal } from "../shopee/deals.ts";
+import { loadAmazonSeedDeals } from "../amazon/deals.ts";
+import {
+  collectFreebies,
+  formatFreebieMessage,
+} from "../freebies/freebie.ts";
 import { sendMessage, sendPhoto } from "../telegram/client.ts";
 import { formatDealMessage } from "../telegram/format.ts";
 import { PostedDb } from "../store/db.ts";
@@ -13,6 +18,8 @@ export interface RunStats {
   eligible: number;
   posted: number;
   skippedAlreadyPosted: number;
+  freebiesFound: number;
+  freebiesPosted: number;
   errors: string[];
 }
 
@@ -72,14 +79,34 @@ async function collectShopeeDeals(config: BotConfig): Promise<Deal[]> {
   return deals;
 }
 
+async function collectAmazonDeals(config: BotConfig): Promise<Deal[]> {
+  if (!config.amazonAffiliateTag) {
+    console.warn("[amazon] AMAZON_AFFILIATE_TAG não configurado — loja Amazon ignorada.");
+    return [];
+  }
+  // Plano B: lista curada em data/amazon-deals.json (sem PA-API).
+  const deals = loadAmazonSeedDeals(config.dataDir, config.amazonAffiliateTag);
+  console.log(`[amazon] ${deals.length} oferta(s) na lista curada.`);
+  return deals;
+}
+
 export async function runJob(config: BotConfig): Promise<RunStats> {
-  const stats: RunStats = { found: 0, eligible: 0, posted: 0, skippedAlreadyPosted: 0, errors: [] };
+  const stats: RunStats = {
+    found: 0,
+    eligible: 0,
+    posted: 0,
+    skippedAlreadyPosted: 0,
+    freebiesFound: 0,
+    freebiesPosted: 0,
+    errors: [],
+  };
   const db = new PostedDb(config.dataDir);
   db.prune();
 
   const found: Deal[] = [];
   if (config.stores.includes("ml")) found.push(...(await collectMlDeals(config)));
   if (config.stores.includes("shopee")) found.push(...(await collectShopeeDeals(config)));
+  if (config.stores.includes("amazon")) found.push(...(await collectAmazonDeals(config)));
   stats.found = found.length;
 
   const fresh = found.filter((d) => {
@@ -122,8 +149,60 @@ export async function runJob(config: BotConfig): Promise<RunStats> {
     }
   }
 
+  // Brindes grátis (Epic + GamerPower, em PT-BR) — depois das ofertas.
+  await publishFreebies(config, db, stats);
+
   db.save();
   return stats;
+}
+
+async function publishFreebies(
+  config: BotConfig,
+  db: PostedDb,
+  stats: RunStats,
+): Promise<void> {
+  const { freebies, errors } = await collectFreebies({
+    sources: config.freebieSources,
+    maxPerRun: config.freebieMaxPerRun,
+    myMemoryEmail: config.myMemoryEmail,
+  });
+  stats.errors.push(...errors);
+  stats.freebiesFound = freebies.length;
+
+  const fresh = freebies.filter((f) => {
+    if (db.has(f.key)) {
+      stats.skippedAlreadyPosted += 1;
+      return false;
+    }
+    return true;
+  });
+
+  for (const freebie of fresh) {
+    const text = formatFreebieMessage(freebie);
+    if (config.dryRun) {
+      console.log(`--- DRY-RUN [freebie:${freebie.source}] ${freebie.key} ---`);
+      console.log(text);
+      console.log(`URL: ${freebie.url}`);
+      stats.freebiesPosted += 1;
+      continue;
+    }
+    try {
+      if (freebie.imageUrl) {
+        await sendPhoto(config.telegramBotToken, config.telegramChatId, freebie.imageUrl, text);
+      } else {
+        await sendMessage(config.telegramBotToken, config.telegramChatId, text);
+      }
+      db.mark(freebie.key, freebie.title);
+      stats.freebiesPosted += 1;
+      await new Promise((r) => setTimeout(r, 1500));
+    } catch (error) {
+      const message = `[${freebie.key}] ${(error as Error).message}`;
+      console.error(message);
+      stats.errors.push(message);
+    }
+  }
+
+  db.save();
 }
 
 export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
