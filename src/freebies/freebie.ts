@@ -108,6 +108,33 @@ async function gamerpowerToFreebie(
   };
 }
 
+function normalizeTitle(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(/\b(giveaway|sorteio|epic games|steam|indiegala|gog|gratis|grátis|free)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * O mesmo jogo costuma aparecer nas duas fontes (ex.: Knightica na Epic
+ * e no GamerPower). A Epic vem primeiro — link direto da loja, texto já
+ * em PT-BR — e o duplicado do GamerPower é descartado.
+ */
+function dedupeFreebies(freebies: Freebie[]): Freebie[] {
+  const epicTitles = freebies
+    .filter((f) => f.source === "epic")
+    .map((f) => normalizeTitle(f.title))
+    .filter((t) => t.length >= 4);
+  return freebies.filter((f) => {
+    if (f.source !== "gamerpower") return true;
+    const n = normalizeTitle(f.title);
+    if (n.length < 4) return true;
+    return !epicTitles.some((e) => n.includes(e) || e.includes(n));
+  });
+}
+
 export async function collectFreebies(
   cfg: FreebieConfig,
   fetchFn: typeof fetch = fetch,
@@ -141,5 +168,5 @@ export async function collectFreebies(
     }
   }
 
-  return { freebies: freebies.slice(0, cfg.maxPerRun), errors };
+  return { freebies: dedupeFreebies(freebies).slice(0, cfg.maxPerRun), errors };
 }
