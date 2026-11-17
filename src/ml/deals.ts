@@ -2,7 +2,7 @@ import { buildAffiliateUrl } from "./affiliate.ts";
 import type { MlSearchItem } from "./search.ts";
 
 export interface Deal {
-  store: "ml" | "shopee";
+  store: "ml" | "shopee" | "amazon";
   /** Chave única para deduplicação, ex.: ml:MLB1234567890 */
   key: string;
   title: string;
