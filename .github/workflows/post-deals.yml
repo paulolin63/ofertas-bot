@@ -22,6 +22,9 @@
 #
 # O data/posted.json é commitado de volta a cada execução para deduplicar
 # entre runs (o runner é efêmero — sem isso, a mesma oferta seria repostada).
+# Calendário semanal de temas (src/theme.ts): cada dia busca as keywords
+# do tema e a 1ª execução do dia anuncia o tema no canal; sábado só
+# jogos grátis, domingo só IA grátis (anúncio, sem post automático).
 
 name: post-deals
 
