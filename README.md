@@ -29,7 +29,7 @@ npm start              # executa e posta de verdade
 | `ML_CLIENT_ID` / `ML_CLIENT_SECRET` | p/ ML | Credenciais da aplicação em developers.mercadolivre.com.br (token por execução) |
 | `SHOPEE_API_APP_ID` / `SHOPEE_API_SECRET` | p/ Shopee | Credenciais da Affiliate Open API |
 | `AMAZON_AFFILIATE_TAG` | p/ Amazon | Tracking ID do Associates (ex.: `lin63-20`) — plano B, lista curada |
-| `DEAL_KEYWORDS` | sim | Palavras-chave separadas por vírgula |
+| `DEAL_KEYWORDS` | não | Palavras-chave separadas por vírgula (fallback — nos dias de tema valem as keywords do tema; ver Calendário semanal) |
 | `DEAL_MIN_DISCOUNT_PCT` | não | Desconto mínimo (padrão 20) |
 | `DEAL_MAX_POSTS_PER_RUN` | não | Máx. de posts por execução (padrão 5) |
 | `DEAL_STORES` | não | `ml,shopee,amazon` (padrão: as três) |
@@ -48,9 +48,20 @@ Para o canal ter algo além de ofertas pagas, cada execução também busca **jo
 
 Setup completo (BotFather, canal, segredos do GitHub, verificação do link ML): veja [docs/SETUP.md](docs/SETUP.md).
 
+## Calendário semanal de temas
+
+Cada dia tem um tema (código em `src/theme.ts`, dia calculado no fuso America/Sao_Paulo):
+
+- segunda 💄 Cosméticos · terça 🚗 Automóveis · quarta 📱 Eletrônicos · quinta 🚴 Esporte e ciclismo · sexta 🏠 Casa e cozinha
+- sábado 🎮 só jogos grátis (sem ofertas pagas) · domingo 🤖 só IA grátis (sem ofertas, sem jogos)
+
+Na primeira execução do dia o bot anuncia o tema no canal ("🎯 Hoje é quarta-feira — dia de ELETRÔNICOS! 📱") — uma vez por dia, com dedup pela chave `theme:YYYY-MM-DD` em `data/posted.json`. Domingo ainda não tem coletor automático de IA grátis: o bot só anuncia o tema; a dica de IA é postada manualmente a partir da lista de recursos gratuitos.
+
 ## ⚠️ Verificar antes de ir ao ar
 
 O link de afiliado do ML **precisa ser validado** contra um link gerado pelo gerador oficial (`mercadolivre.com.br/afiliados/linkbuilder`). Um link comum copiado da barra do navegador não carrega a sua identificação. Veja o passo 4 em [docs/SETUP.md](docs/SETUP.md).
+
+**Cupons**: a API da Shopee (`productOfferV2`) não expõe campo de cupom/voucher nos SDKs e na documentação pública consultados (2026-11-18) — por isso o bot ainda não anexa cupons aos posts. A confirmação definitiva exige uma introspecção do schema GraphQL com as credenciais da Shopee (pendente).
 
 ## Execução agendada
 
