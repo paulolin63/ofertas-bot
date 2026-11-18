@@ -13,8 +13,16 @@ import {
 import { sendMessage, sendPhoto } from "../telegram/client.ts";
 import { formatDealMessage } from "../telegram/format.ts";
 import { PostedDb } from "../store/db.ts";
+import {
+  formatThemeAnnouncement,
+  getTheme,
+  themeAnnouncementKey,
+  type DayTheme,
+} from "../theme.ts";
 
 export interface RunStats {
+  theme: string;
+  themeAnnouncement: boolean;
   found: number;
   eligible: number;
   posted: number;
@@ -91,8 +99,14 @@ async function collectAmazonDeals(config: BotConfig): Promise<Deal[]> {
   return deals;
 }
 
-export async function runJob(config: BotConfig): Promise<RunStats> {
+export async function runJob(config: BotConfig, now: Date = new Date()): Promise<RunStats> {
+  const theme: DayTheme = getTheme(now);
+  // No dia de tema, as palavras-chave do tema substituem DEAL_KEYWORDS.
+  const effectiveConfig: BotConfig =
+    theme.keywords.length > 0 ? { ...config, keywords: theme.keywords } : config;
   const stats: RunStats = {
+    theme: theme.name,
+    themeAnnouncement: false,
     found: 0,
     eligible: 0,
     posted: 0,
@@ -104,10 +118,13 @@ export async function runJob(config: BotConfig): Promise<RunStats> {
   const db = new PostedDb(config.dataDir);
   db.prune();
 
+  // Sábado (só jogos grátis) e domingo (só IA grátis): sem ofertas pagas.
   const found: Deal[] = [];
-  if (config.stores.includes("ml")) found.push(...(await collectMlDeals(config)));
-  if (config.stores.includes("shopee")) found.push(...(await collectShopeeDeals(config)));
-  if (config.stores.includes("amazon")) found.push(...(await collectAmazonDeals(config)));
+  if (theme.mode === "deals") {
+    if (effectiveConfig.stores.includes("ml")) found.push(...(await collectMlDeals(effectiveConfig)));
+    if (effectiveConfig.stores.includes("shopee")) found.push(...(await collectShopeeDeals(effectiveConfig)));
+    if (effectiveConfig.stores.includes("amazon")) found.push(...(await collectAmazonDeals(effectiveConfig)));
+  }
   stats.found = found.length;
 
   const fresh = found.filter((d) => {
@@ -123,16 +140,43 @@ export async function runJob(config: BotConfig): Promise<RunStats> {
   // Brindes: a coleta acontece ANTES da checagem do token, para o log
   // mostrar o que foi encontrado mesmo sem token (o post em si continua
   // exigindo o token — sem ele, a execução falha aqui, como esperado).
-  const { freebies, errors: freebieErrors } = await collectFreebies({
-    sources: config.freebieSources,
-    maxPerRun: config.freebieMaxPerRun,
-    myMemoryEmail: config.myMemoryEmail,
-  });
+  // Domingo (só IA grátis): sem jogos — a coleta de brindes é pulada.
+  const { freebies, errors: freebieErrors } =
+    theme.mode === "free-ai"
+      ? { freebies: [] as Freebie[], errors: [] as string[] }
+      : await collectFreebies({
+          sources: config.freebieSources,
+          maxPerRun: config.freebieMaxPerRun,
+          myMemoryEmail: config.myMemoryEmail,
+        });
   stats.errors.push(...freebieErrors);
   stats.freebiesFound = freebies.length;
 
   if (!config.dryRun && (!config.telegramBotToken || !config.telegramChatId)) {
     throw new Error("TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID são obrigatórios (ou rode com --dry-run).");
+  }
+
+  // Anúncio do tema do dia — só na primeira execução do dia (BRT).
+  // A chave é marcada só depois do envio real; em dry-run, não marca.
+  const announcementKey = themeAnnouncementKey(now);
+  if (!db.has(announcementKey)) {
+    const text = formatThemeAnnouncement(theme, now);
+    if (config.dryRun) {
+      console.log(`--- DRY-RUN [theme] ${announcementKey} ---`);
+      console.log(text);
+      stats.themeAnnouncement = true;
+    } else {
+      try {
+        await sendMessage(config.telegramBotToken, config.telegramChatId, text);
+        db.mark(announcementKey, `Tema do dia: ${theme.name}`);
+        stats.themeAnnouncement = true;
+        await new Promise((r) => setTimeout(r, 1500));
+      } catch (error) {
+        const message = `[${announcementKey}] ${(error as Error).message}`;
+        console.error(message);
+        stats.errors.push(message);
+      }
+    }
   }
 
   for (const deal of picked) {
@@ -212,7 +256,13 @@ async function publishFreebies(
 
 export async function main(argv: string[] = process.argv.slice(2)): Promise<void> {
   const config = loadConfig(argv);
-  if (config.keywords.length === 0) {
+  const theme = getTheme();
+  // Sábado/domingo não buscam ofertas, então não precisam de keywords.
+  if (
+    theme.mode === "deals" &&
+    theme.keywords.length === 0 &&
+    config.keywords.length === 0
+  ) {
     throw new Error("Configure DEAL_KEYWORDS (ex.: DEAL_KEYWORDS=capacete ciclismo,air fryer).");
   }
   const stats = await runJob(config);
