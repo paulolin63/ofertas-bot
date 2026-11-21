@@ -48,7 +48,7 @@ test("formatThemeAnnouncement traz o dia em PT-BR e o tema em maiúsculas", () =
   const sat = formatThemeAnnouncement(getTheme(atNoonBrt("2026-11-21")), atNoonBrt("2026-11-21"));
   assert.match(sat, /sábado/);
   assert.match(sat, /JOGOS GRÁTIS/);
-  assert.match(sat, /Sem ofertas pagas/);
+  assert.match(sat, /se não tiver jogo novo/);
   const sun = formatThemeAnnouncement(getTheme(atNoonBrt("2026-11-22")), atNoonBrt("2026-11-22"));
   assert.match(sun, /domingo/);
   assert.match(sun, /IA GRÁTIS/);
@@ -112,12 +112,42 @@ test("runJob na quarta busca as keywords do tema, não as padrão", async () => 
   }
 });
 
-test("runJob no sábado não busca ofertas pagas, só anuncia o tema", async () => {
+test("runJob no sábado com jogo novo não busca ofertas pagas, só anuncia o tema", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ofertas-theme-"));
   let shopeeCalls = 0;
+  const epicBody = {
+    data: {
+      Catalog: {
+        searchStore: {
+          elements: [
+            {
+              title: "Jogo Teste",
+              description: "Um jogo grátis de teste.",
+              productSlug: "jogo-teste",
+              price: { totalPrice: { fmtPrice: { originalPrice: "R$ 39,99" } } },
+              promotions: {
+                promotionalOffers: [
+                  {
+                    promotionalOffers: [
+                      {
+                        startDate: "2026-01-01T00:00:00.000Z",
+                        endDate: "2027-12-31T00:00:00.000Z",
+                        discountSetting: { discountPercentage: 0 },
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    },
+  };
   const realFetch = globalThis.fetch;
   globalThis.fetch = (async (url: string) => {
     if (url.includes("open-api.affiliate.shopee.com.br")) shopeeCalls += 1;
+    if (url.includes("epicgames")) return new Response(JSON.stringify(epicBody));
     return new Response(JSON.stringify({}));
   }) as unknown as typeof fetch;
   try {
@@ -128,14 +158,51 @@ test("runJob no sábado não busca ofertas pagas, só anuncia o tema", async () 
         shopeeAppId: "id",
         shopeeSecret: "secret",
         keywords: ["capacete ciclismo"],
+        freebieSources: ["epic"],
       }),
       atNoonBrt("2026-11-21"),
     );
     assert.equal(stats.theme, "Jogos grátis");
     assert.equal(stats.themeAnnouncement, true);
+    assert.equal(stats.freebiesFound, 1);
     assert.equal(shopeeCalls, 0);
     assert.equal(stats.found, 0);
     assert.equal(stats.posted, 0);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("runJob no sábado sem jogo novo busca ofertas de reserva", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ofertas-theme-"));
+  let shopeeCalls = 0;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string) => {
+    if (url.includes("open-api.affiliate.shopee.com.br")) {
+      shopeeCalls += 1;
+      return new Response(JSON.stringify({ data: { productOfferV2: { nodes: [] } } }));
+    }
+    if (url.includes("epicgames")) {
+      return new Response(JSON.stringify({ data: { Catalog: { searchStore: { elements: [] } } } }));
+    }
+    return new Response(JSON.stringify({}));
+  }) as unknown as typeof fetch;
+  try {
+    const stats = await runJob(
+      config({
+        dataDir: dir,
+        stores: ["shopee"],
+        shopeeAppId: "id",
+        shopeeSecret: "secret",
+        keywords: ["capacete ciclismo"],
+        freebieSources: ["epic"],
+      }),
+      atNoonBrt("2026-11-21"),
+    );
+    assert.equal(stats.theme, "Jogos grátis");
+    assert.equal(stats.freebiesFound, 0);
+    // Sem jogo novo: entra a busca de ofertas de reserva (1 keyword padrão).
+    assert.equal(shopeeCalls, 1);
   } finally {
     globalThis.fetch = realFetch;
   }
