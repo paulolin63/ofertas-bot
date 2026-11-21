@@ -118,9 +118,30 @@ export async function runJob(config: BotConfig, now: Date = new Date()): Promise
   const db = new PostedDb(config.dataDir);
   db.prune();
 
-  // Sábado (só jogos grátis) e domingo (só IA grátis): sem ofertas pagas.
+  // Brindes: a coleta acontece ANTES da checagem do token, para o log
+  // mostrar o que foi encontrado mesmo sem token (o post em si continua
+  // exigindo o token — sem ele, a execução falha aqui, como esperado).
+  // Domingo (só IA grátis): sem jogos — a coleta de brindes é pulada.
+  const { freebies, errors: freebieErrors } =
+    theme.mode === "free-ai"
+      ? { freebies: [] as Freebie[], errors: [] as string[] }
+      : await collectFreebies({
+          sources: config.freebieSources,
+          maxPerRun: config.freebieMaxPerRun,
+          myMemoryEmail: config.myMemoryEmail,
+        });
+  stats.errors.push(...freebieErrors);
+  stats.freebiesFound = freebies.length;
+  const freshFreebies = freebies.filter((f) => !db.has(f.key));
+
+  // Ofertas pagas: nos dias de tema (seg–sex) sempre; no sábado (jogos
+  // grátis) só como reserva, quando não há jogo novo para postar
+  // (decisão do usuário em 2026-11-21). Domingo nunca.
+  const wantDeals =
+    theme.mode === "deals" ||
+    (theme.mode === "free-games" && freshFreebies.length === 0);
   const found: Deal[] = [];
-  if (theme.mode === "deals") {
+  if (wantDeals) {
     if (effectiveConfig.stores.includes("ml")) found.push(...(await collectMlDeals(effectiveConfig)));
     if (effectiveConfig.stores.includes("shopee")) found.push(...(await collectShopeeDeals(effectiveConfig)));
     if (effectiveConfig.stores.includes("amazon")) found.push(...(await collectAmazonDeals(effectiveConfig)));
@@ -136,21 +157,6 @@ export async function runJob(config: BotConfig, now: Date = new Date()): Promise
   });
   const picked = pickDeals(fresh, config.minDiscountPct, config.maxPostsPerRun);
   stats.eligible = picked.length;
-
-  // Brindes: a coleta acontece ANTES da checagem do token, para o log
-  // mostrar o que foi encontrado mesmo sem token (o post em si continua
-  // exigindo o token — sem ele, a execução falha aqui, como esperado).
-  // Domingo (só IA grátis): sem jogos — a coleta de brindes é pulada.
-  const { freebies, errors: freebieErrors } =
-    theme.mode === "free-ai"
-      ? { freebies: [] as Freebie[], errors: [] as string[] }
-      : await collectFreebies({
-          sources: config.freebieSources,
-          maxPerRun: config.freebieMaxPerRun,
-          myMemoryEmail: config.myMemoryEmail,
-        });
-  stats.errors.push(...freebieErrors);
-  stats.freebiesFound = freebies.length;
 
   if (!config.dryRun && (!config.telegramBotToken || !config.telegramChatId)) {
     throw new Error("TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID são obrigatórios (ou rode com --dry-run).");
