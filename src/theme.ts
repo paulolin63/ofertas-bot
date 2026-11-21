@@ -4,7 +4,8 @@
  * Definido com o usuário em 2026-11-17 (e confirmado em 2026-11-18):
  *   segunda 💄 Cosméticos · terça 🚗 Automóveis · quarta 📱 Eletrônicos
  *   quinta 🚴 Esporte e ciclismo · sexta 🏠 Casa e cozinha
- *   sábado 🎮 SÓ jogos grátis · domingo 🤖 SÓ IA grátis (nunca misturar)
+ *   sábado 🎮 jogos grátis (ofertas só como reserva, quando não há jogo
+ *   novo — decisão de 2026-11-21) · domingo 🤖 SÓ IA grátis
  *
  * O dia é calculado no fuso America/Sao_Paulo — o runner do GitHub
  * Actions roda em UTC, então `new Date().getDay()` daria o dia errado
@@ -113,7 +114,7 @@ export function formatThemeAnnouncement(theme: DayTheme, date: Date = new Date()
   const weekday = WEEKDAY_PT[getBrtWeekday(date)];
   const head = `🎯 Hoje é ${weekday} — dia de ${theme.name.toUpperCase()}! ${theme.emoji}`;
   if (theme.mode === "free-games") {
-    return `${head}\n\nHoje só entram jogos grátis (Epic, GamerPower). Sem ofertas pagas hoje. 🎁`;
+    return `${head}\n\nHoje entram jogos grátis (Epic, GamerPower) — e, se não tiver jogo novo, algumas ofertas selecionadas. 🎁`;
   }
   if (theme.mode === "free-ai") {
     return `${head}\n\nHoje só entra uma dica de ferramenta de IA gratuita. Sem ofertas, sem jogos. ✨`;
