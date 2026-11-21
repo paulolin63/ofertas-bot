@@ -31,7 +31,7 @@ O bot anexa a sua etiqueta (`matt_tool`) ao permalink do produto. Antes de autom
 3. Confira: o link gerado contém `matt_tool=SUA_ETIQUETA`? E contém algum outro parâmetro de afiliado além de `matt_tool` e `matt_word`?
 4. Se houver parâmetro extra, me avise — eu ajusto o `buildAffiliateUrl` antes do primeiro post real.
 
-A etiqueta que aparece nos cards do Peleia é `97951676` — confirme que é a sua etiqueta de afiliado (e não, por exemplo, uma etiqueta de campanha).
+A etiqueta oficial do Mercado Livre é `35439858` (pauloclark) — o bot anexa `matt_tool=35439858`.
 
 ## 5. Subir o repositório
 
