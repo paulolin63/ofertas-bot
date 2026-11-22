@@ -13,6 +13,13 @@ import {
 import { sendMessage, sendPhoto } from "../telegram/client.ts";
 import { formatDealMessage } from "../telegram/format.ts";
 import { PostedDb } from "../store/db.ts";
+import { titleDedupKey } from "../store/titleKey.ts";
+import {
+  aiTipKey,
+  formatAiTipMessage,
+  pickAiTips,
+  type AiTip,
+} from "../aitips/tips.ts";
 import {
   formatThemeAnnouncement,
   getTheme,
@@ -29,6 +36,7 @@ export interface RunStats {
   skippedAlreadyPosted: number;
   freebiesFound: number;
   freebiesPosted: number;
+  aiTipsPosted: number;
   errors: string[];
 }
 
@@ -113,6 +121,7 @@ export async function runJob(config: BotConfig, now: Date = new Date()): Promise
     skippedAlreadyPosted: 0,
     freebiesFound: 0,
     freebiesPosted: 0,
+    aiTipsPosted: 0,
     errors: [],
   };
   const db = new PostedDb(config.dataDir);
@@ -134,12 +143,20 @@ export async function runJob(config: BotConfig, now: Date = new Date()): Promise
   stats.freebiesFound = freebies.length;
   const freshFreebies = freebies.filter((f) => !db.has(f.key));
 
+  // Domingo (IA grátis): dica automática da lista curada (1 por
+  // execução, com dedup de 30 dias). Se a lista esgotar na janela,
+  // entram ofertas de reserva (decisão do usuário em 2026-11-22).
+  const aiTips: AiTip[] =
+    theme.mode === "free-ai" ? pickAiTips((key) => db.has(key), 1) : [];
+
   // Ofertas pagas: nos dias de tema (seg–sex) sempre; no sábado (jogos
   // grátis) só como reserva, quando não há jogo novo para postar
-  // (decisão do usuário em 2026-11-21). Domingo nunca.
+  // (decisão do usuário em 2026-11-21); no domingo (IA grátis) só como
+  // reserva, quando não há dica nova (2026-11-22).
   const wantDeals =
     theme.mode === "deals" ||
-    (theme.mode === "free-games" && freshFreebies.length === 0);
+    (theme.mode === "free-games" && freshFreebies.length === 0) ||
+    (theme.mode === "free-ai" && aiTips.length === 0);
   const found: Deal[] = [];
   if (wantDeals) {
     if (effectiveConfig.stores.includes("ml")) found.push(...(await collectMlDeals(effectiveConfig)));
@@ -148,11 +165,17 @@ export async function runJob(config: BotConfig, now: Date = new Date()): Promise
   }
   stats.found = found.length;
 
+  // Dedup por item E por título normalizado: o mesmo produto genérico
+  // de vendedores diferentes (shopId/itemId distintos) não volta a
+  // postar dentro da janela de 30 dias (ver titleKey.ts).
+  const seenTitles = db.titleKeySet();
   const fresh = found.filter((d) => {
-    if (db.has(d.key)) {
+    const tKey = titleDedupKey(d.title);
+    if (db.has(d.key) || seenTitles.has(tKey)) {
       stats.skippedAlreadyPosted += 1;
       return false;
     }
+    seenTitles.add(tKey);
     return true;
   });
   const picked = pickDeals(fresh, config.minDiscountPct, config.maxPostsPerRun);
@@ -185,6 +208,9 @@ export async function runJob(config: BotConfig, now: Date = new Date()): Promise
     }
   }
 
+  // Dicas de IA grátis (domingo) — logo depois do anúncio do tema.
+  await publishAiTips(config, db, stats, aiTips);
+
   for (const deal of picked) {
     const text = formatDealMessage(deal);
     if (config.dryRun) {
@@ -216,6 +242,33 @@ export async function runJob(config: BotConfig, now: Date = new Date()): Promise
 
   db.save();
   return stats;
+}
+
+async function publishAiTips(
+  config: BotConfig,
+  db: PostedDb,
+  stats: RunStats,
+  aiTips: AiTip[],
+): Promise<void> {
+  for (const tip of aiTips) {
+    const text = formatAiTipMessage(tip);
+    if (config.dryRun) {
+      console.log(`--- DRY-RUN [aitip] ${aiTipKey(tip)} ---`);
+      console.log(text);
+      stats.aiTipsPosted += 1;
+      continue;
+    }
+    try {
+      await sendMessage(config.telegramBotToken, config.telegramChatId, text);
+      db.mark(aiTipKey(tip), `Dica de IA: ${tip.name}`);
+      stats.aiTipsPosted += 1;
+      await new Promise((r) => setTimeout(r, 1500));
+    } catch (error) {
+      const message = `[${aiTipKey(tip)}] ${(error as Error).message}`;
+      console.error(message);
+      stats.errors.push(message);
+    }
+  }
 }
 
 async function publishFreebies(
