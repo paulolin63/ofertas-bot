@@ -5,13 +5,13 @@
  *   segunda 💄 Cosméticos · terça 🚗 Automóveis · quarta 📱 Eletrônicos
  *   quinta 🚴 Esporte e ciclismo · sexta 🏠 Casa e cozinha
  *   sábado 🎮 jogos grátis (ofertas só como reserva, quando não há jogo
- *   novo — decisão de 2026-11-21) · domingo 🤖 SÓ IA grátis
+ *   novo — decisão de 2026-11-21) · domingo 🤖 IA grátis (dica automática
+ *   da lista curada em src/aitips/tips.ts; ofertas só como reserva,
+ *   quando a lista esgota — decisão de 2026-11-22)
  *
  * O dia é calculado no fuso America/Sao_Paulo — o runner do GitHub
  * Actions roda em UTC, então `new Date().getDay()` daria o dia errado
- * nas execuções da madrugada/noite. Domingo não tem coletor automático
- * de IA grátis ainda: nesse dia o bot só anuncia o tema e não posta
- * nada sozinho (a dica de IA é manual, da lista de recursos gratuitos).
+ * nas execuções da madrugada/noite.
  */
 
 export type ThemeMode = "deals" | "free-games" | "free-ai";
@@ -117,7 +117,7 @@ export function formatThemeAnnouncement(theme: DayTheme, date: Date = new Date()
     return `${head}\n\nHoje entram jogos grátis (Epic, GamerPower) — e, se não tiver jogo novo, algumas ofertas selecionadas. 🎁`;
   }
   if (theme.mode === "free-ai") {
-    return `${head}\n\nHoje só entra uma dica de ferramenta de IA gratuita. Sem ofertas, sem jogos. ✨`;
+    return `${head}\n\nHoje entram dicas de ferramentas de IA gratuitas — e, se não tiver dica nova, algumas ofertas selecionadas. ✨`;
   }
   return `${head}\n\nHoje só entram ofertas de ${theme.name.toLowerCase()}. Fica de olho! 👀`;
 }
