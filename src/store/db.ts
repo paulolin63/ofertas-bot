@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { titleDedupKey } from "./titleKey.ts";
 
 /** Registro simples de ofertas já postadas (deduplicação entre execuções). */
 export interface PostedStore {
@@ -28,6 +29,19 @@ export class PostedDb {
 
   has(key: string): boolean {
     return key in this.data.posted;
+  }
+
+  /**
+   * Chaves de título de tudo que já foi postado — dedup de produto
+   * repetido entre vendedores (ver titleKey.ts). Derivado dos títulos
+   * já gravados, então registros antigos também contam.
+   */
+  titleKeySet(): Set<string> {
+    const keys = new Set<string>();
+    for (const value of Object.values(this.data.posted)) {
+      if (value.title) keys.add(titleDedupKey(value.title));
+    }
+    return keys;
   }
 
   mark(key: string, title: string): void {
