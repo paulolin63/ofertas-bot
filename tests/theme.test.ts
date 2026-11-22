@@ -52,7 +52,7 @@ test("formatThemeAnnouncement traz o dia em PT-BR e o tema em maiúsculas", () =
   const sun = formatThemeAnnouncement(getTheme(atNoonBrt("2026-11-22")), atNoonBrt("2026-11-22"));
   assert.match(sun, /domingo/);
   assert.match(sun, /IA GRÁTIS/);
-  assert.match(sun, /Sem ofertas, sem jogos/);
+  assert.match(sun, /se não tiver dica nova/);
 });
 
 function config(partial: Partial<BotConfig> & { dataDir: string }): BotConfig {
@@ -208,7 +208,7 @@ test("runJob no sábado sem jogo novo busca ofertas de reserva", async () => {
   }
 });
 
-test("runJob no domingo não busca ofertas nem brindes, só anuncia o tema", async () => {
+test("runJob no domingo posta dica de IA e não busca ofertas nem brindes", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ofertas-theme-"));
   const calls: string[] = [];
   const realFetch = globalThis.fetch;
@@ -229,9 +229,99 @@ test("runJob no domingo não busca ofertas nem brindes, só anuncia o tema", asy
     );
     assert.equal(stats.theme, "IA grátis");
     assert.equal(stats.themeAnnouncement, true);
+    assert.equal(stats.aiTipsPosted, 1);
     assert.equal(stats.found, 0);
     assert.equal(stats.freebiesFound, 0);
     assert.ok(!calls.some((u) => u.includes("shopee") || u.includes("epicgames") || u.includes("gamerpower")));
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("runJob no domingo sem dica nova busca ofertas de reserva", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ofertas-theme-"));
+  // Marca todas as dicas como postadas (janela de 30 dias) antes da execução.
+  const { AI_TIPS, aiTipKey } = await import("../src/aitips/tips.ts");
+  const posted: Record<string, { at: string; title: string }> = {};
+  for (const tip of AI_TIPS) {
+    posted[aiTipKey(tip)] = { at: new Date().toISOString(), title: `Dica de IA: ${tip.name}` };
+  }
+  fs.writeFileSync(path.join(dir, "posted.json"), JSON.stringify({ posted }, null, 2));
+  let shopeeCalls = 0;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string) => {
+    if (url.includes("open-api.affiliate.shopee.com.br")) {
+      shopeeCalls += 1;
+      return new Response(JSON.stringify({ data: { productOfferV2: { nodes: [] } } }));
+    }
+    return new Response(JSON.stringify({}));
+  }) as unknown as typeof fetch;
+  try {
+    const stats = await runJob(
+      config({
+        dataDir: dir,
+        stores: ["shopee"],
+        shopeeAppId: "id",
+        shopeeSecret: "secret",
+        keywords: ["capacete ciclismo"],
+        freebieSources: ["epic"],
+      }),
+      atNoonBrt("2026-11-22"),
+    );
+    assert.equal(stats.theme, "IA grátis");
+    assert.equal(stats.aiTipsPosted, 0);
+    // Sem dica nova: entra a busca de ofertas de reserva (1 keyword padrão).
+    assert.equal(shopeeCalls, 1);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("runJob não posta o mesmo produto duas vezes (dedup por título)", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ofertas-theme-"));
+  const offer = (shopId: number, itemId: number) => ({
+    itemId,
+    shopId,
+    productName:
+      "1/2/3 Forma De Silicone Para Air Fryer Forno Microondas Fritadeira Assadeira Reutilizável Antiaderente Flexível",
+    productLink: `https://shopee.com.br/produto-i.${shopId}.${itemId}`,
+    offerLink: `https://shope.ee/${shopId}-${itemId}`,
+    imageUrl: "https://cf.shopee.com.br/file/img",
+    priceMin: "10.00",
+    priceMax: "10.00",
+    priceDiscountRate: 50,
+    commissionRate: "0.03",
+    sellerCommissionRate: "0",
+    shopeeCommissionRate: "0.03",
+    commission: "0.30",
+    sales: 5085,
+    ratingStar: "4.8",
+    shopName: "Loja Teste",
+  });
+  let firstCall = true;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string) => {
+    if (url.includes("open-api.affiliate.shopee.com.br")) {
+      // O mesmo produto genérico em duas lojas diferentes (chaves distintas).
+      const nodes = firstCall ? [offer(111, 1001), offer(222, 2002)] : [];
+      firstCall = false;
+      return new Response(JSON.stringify({ data: { productOfferV2: { nodes } } }));
+    }
+    return new Response(JSON.stringify({}));
+  }) as unknown as typeof fetch;
+  try {
+    const stats = await runJob(
+      config({
+        dataDir: dir,
+        stores: ["shopee"],
+        shopeeAppId: "id",
+        shopeeSecret: "secret",
+      }),
+      atNoonBrt("2026-11-18"),
+    );
+    assert.equal(stats.found, 2);
+    assert.equal(stats.skippedAlreadyPosted, 1);
+    assert.equal(stats.posted, 1);
   } finally {
     globalThis.fetch = realFetch;
   }

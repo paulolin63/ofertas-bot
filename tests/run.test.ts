@@ -44,7 +44,14 @@ test("runJob coleta os brindes antes de exigir o token do Telegram", async () =>
   }) as unknown as typeof fetch;
   try {
     await assert.rejects(
-      () => runJob(config({ dataDir: dir, freebieSources: ["epic"] })),
+      // Data fixa numa quarta-feira: no domingo (IA grátis) a coleta de
+      // brindes é pulada por design, então o teste não pode depender do
+      // dia em que roda.
+      () =>
+        runJob(
+          config({ dataDir: dir, freebieSources: ["epic"] }),
+          new Date("2026-11-18T12:00:00-03:00"),
+        ),
       /TELEGRAM_BOT_TOKEN/,
     );
     // A coleta da Epic aconteceu antes do erro — sem isso, o log do
