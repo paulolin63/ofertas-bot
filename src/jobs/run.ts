@@ -5,6 +5,7 @@ import { mlItemToDeal, pickDeals, type Deal } from "../ml/deals.ts";
 import { searchProductOffers } from "../shopee/api.ts";
 import { shopeeOfferToDeal } from "../shopee/deals.ts";
 import { loadAmazonSeedDeals } from "../amazon/deals.ts";
+import { scrapeAmazonSearch } from "../amazon/firecrawl.ts";
 import {
   collectFreebies,
   formatFreebieMessage,
@@ -101,7 +102,27 @@ async function collectAmazonDeals(config: BotConfig): Promise<Deal[]> {
     console.warn("[amazon] AMAZON_AFFILIATE_TAG não configurado — loja Amazon ignorada.");
     return [];
   }
-  // Plano B: lista curada em data/amazon-deals.json (sem PA-API).
+  // Plano C: busca via Firecrawl Cloud (API) — a busca pública direta é
+  // bloqueada em datacenter e a PA-API exige vendas qualificadas.
+  if (config.firecrawlApiKey) {
+    const deals: Deal[] = [];
+    for (const keyword of config.keywords) {
+      try {
+        const found = await scrapeAmazonSearch(
+          keyword,
+          config.firecrawlApiKey,
+          config.amazonAffiliateTag,
+        );
+        deals.push(...found);
+      } catch (error) {
+        console.error(`[amazon] busca Firecrawl "${keyword}" falhou:`, (error as Error).message);
+      }
+    }
+    console.log(`[amazon] ${deals.length} oferta(s) via Firecrawl.`);
+    return deals;
+  }
+  // Sem FIRECRAWL_API_KEY, volta ao plano B: lista curada.
+  console.warn("[amazon] FIRECRAWL_API_KEY não configurado — usando lista curada (plano B).");
   const deals = loadAmazonSeedDeals(config.dataDir, config.amazonAffiliateTag);
   console.log(`[amazon] ${deals.length} oferta(s) na lista curada.`);
   return deals;
