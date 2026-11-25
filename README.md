@@ -66,3 +66,18 @@ O link de afiliado do ML **precisa ser validado** contra um link gerado pelo ger
 ## Execução agendada
 
 Workflow `.github/workflows/post-deals.yml`: roda 4× ao dia (10h, 13h, 16h, 19h BRT) no GitHub Actions, sem servidor. O `data/posted.json` é commitado de volta a cada run para não repostar a mesma oferta.
+
+
+## Digest diário de AI/tecnologia (Telegram privado)
+
+O workflow separado `.github/workflows/ai-news-digest.yml` envia um digest por dia às **08:07, horário de São Paulo**. Ele acompanha os feeds abertos do OpenAI News, Hugging Face Blog, TechCrunch AI, GitHub Blog e Hacker News; filtra posts do GitHub para temas de AI/desenvolvimento e traduz títulos e trechos curtos para chinês tradicional via MyMemory, mantendo o link original. Se a tradução falhar, envia o texto original. É um resumo de manchetes e trechos — não usa LLM nem exige uma chave de IA, e não precisa manter um servidor RSSHub ligado.
+
+O destino é independente: `TELEGRAM_NEWS_CHAT_ID` é usado somente pelo digest. O `TELEGRAM_CHAT_ID` existente continua apontando para o canal/grupo de ofertas. Para ativar o privado, use Actions → `ai-news-digest` → Run workflow:
+
+1. Execute `identify_bot` para ver o username do bot já configurado.
+2. Abra o bot no Telegram, toque em Start e envie `/start digestsetup`.
+3. Execute `capture_private_chat_id`; o bot envia o ID privado somente para aquela conversa. O ID não é exibido nos logs da execução.
+4. Salve esse número no repositório como secret `TELEGRAM_NEWS_CHAT_ID` em Settings → Secrets and variables → Actions.
+5. Selecione `preview` para conferir sem publicar, ou `send_digest` para testar o envio privado.
+
+A deduplicação é gravada em `data/news-digest-posted.json`, separada do histórico de ofertas.

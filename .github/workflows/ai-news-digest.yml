@@ -1,0 +1,69 @@
+name: ai-news-digest
+
+on:
+  schedule:
+    - cron: "7 8 * * *"
+      timezone: "America/Sao_Paulo"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Setup or run the private AI/technology digest"
+        type: choice
+        required: true
+        default: identify_bot
+        options:
+          - identify_bot
+          - capture_private_chat_id
+          - preview
+          - send_digest
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ai-news-digest
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_NEWS_CHAT_ID: ${{ secrets.TELEGRAM_NEWS_CHAT_ID }}
+      MYMEMORY_EMAIL: ${{ secrets.MYMEMORY_EMAIL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Identify existing Telegram bot
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'identify_bot'
+        run: node src/news/bootstrap.ts identify
+
+      - name: Send private chat ID to the user in Telegram
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'capture_private_chat_id'
+        run: node src/news/bootstrap.ts capture
+
+      - name: Preview digest without sending
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'preview'
+        run: node src/news/digest.ts preview
+
+      - name: Send daily digest to the separate private chat
+        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'send_digest')
+        run: node src/news/digest.ts send
+
+      - name: Persist delivered-item history
+        if: success() && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'send_digest'))
+        run: |
+          if [ -f data/news-digest-posted.json ]; then
+            git config user.name "ofertas-bot"
+            git config user.email "ofertas-bot@users.noreply.github.com"
+            git add data/news-digest-posted.json
+            if ! git diff --cached --quiet; then
+              git commit -m "chore: update AI news digest history [skip ci]"
+              git push
+            fi
+          else
+            echo "No delivered-item history to persist yet."
+          fi

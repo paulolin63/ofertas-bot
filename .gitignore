@@ -4,3 +4,4 @@ dist/
 data/*.json
 !data/.gitkeep
 !data/posted.json
+!data/news-digest-posted.json

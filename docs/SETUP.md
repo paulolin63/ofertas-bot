@@ -70,3 +70,18 @@ A busca pública do ML devolve 403 em IPs de datacenter — testado na VM e nos 
 - Deduplicação de 30 dias por oferta.
 - Só produtos novos no ML (usados não entram no programa de afiliados).
 - Cada post carrega o selo "Link de afiliado — você paga o mesmo preço."
+
+
+## 8. Digest diário de AI/tecnologia no Telegram privado
+
+O workflow `.github/workflows/ai-news-digest.yml` roda diariamente às 08:07 em `America/Sao_Paulo`. Ele acompanha OpenAI News, Hugging Face Blog, TechCrunch AI, GitHub Blog e Hacker News; no feed geral do GitHub, mantém somente tópicos de AI/desenvolvimento. Traduz títulos e pequenos trechos para chinês tradicional pelo MyMemory e inclui os links originais. É um digest de manchetes e trechos, não uma síntese por LLM; não requer uma chave de IA nem servidor RSSHub autohospedado. Se a tradução estiver indisponível, o conteúdo original é mantido.
+
+O envio fica separado do canal/grupo de ofertas. Não altere `TELEGRAM_CHAT_ID`; o digest usa o novo secret `TELEGRAM_NEWS_CHAT_ID`.
+
+1. Em **Actions → ai-news-digest → Run workflow**, execute `identify_bot` para descobrir o username do bot existente.
+2. No Telegram, abra esse bot, toque em **Start** e envie `/start digestsetup`. O Telegram exige que a pessoa inicie a conversa antes de um bot poder enviar mensagens privadas.
+3. Execute `capture_private_chat_id`. O próprio bot envia o chat ID de volta nessa conversa privada; esse valor não aparece nos logs do GitHub Actions.
+4. Em **Settings → Secrets and variables → Actions**, crie o repository secret `TELEGRAM_NEWS_CHAT_ID` com o número recebido.
+5. Execute `preview` para conferir o texto sem enviar, ou `send_digest` para fazer o primeiro envio.
+
+A rotina diária, quando ativada pelo secret, envia somente para esse chat privado. O histórico de links enviados fica em `data/news-digest-posted.json`, sem modificar `data/posted.json` ou o workflow das ofertas.
