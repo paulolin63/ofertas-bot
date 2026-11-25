@@ -11,6 +11,7 @@ export interface BotConfig {
   shopeeAppId: string;
   shopeeSecret: string;
   amazonAffiliateTag: string;
+  firecrawlApiKey: string;
   freebieSources: Array<"epic" | "gamerpower">;
   freebieMaxPerRun: number;
   myMemoryEmail: string;
@@ -102,6 +103,7 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): BotConfig {
     shopeeAppId: env.SHOPEE_API_APP_ID ?? "",
     shopeeSecret: env.SHOPEE_API_SECRET ?? "",
     amazonAffiliateTag: env.AMAZON_AFFILIATE_TAG ?? "",
+    firecrawlApiKey: env.FIRECRAWL_API_KEY ?? "",
     freebieSources: freebieSourcesRaw.length > 0 ? freebieSourcesRaw : ["epic", "gamerpower"],
     freebieMaxPerRun: num("FREEBIE_MAX_PER_RUN", 3),
     myMemoryEmail: env.MYMEMORY_EMAIL ?? "",
