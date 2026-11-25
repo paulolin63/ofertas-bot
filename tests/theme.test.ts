@@ -66,6 +66,7 @@ function config(partial: Partial<BotConfig> & { dataDir: string }): BotConfig {
     shopeeAppId: "",
     shopeeSecret: "",
     amazonAffiliateTag: "",
+    firecrawlApiKey: "",
     freebieSources: [],
     freebieMaxPerRun: 3,
     myMemoryEmail: "",
