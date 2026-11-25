@@ -11,8 +11,11 @@
 #   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, ML_AFFILIATE_TAG,
 #   ML_CLIENT_ID, ML_CLIENT_SECRET,
 #   SHOPEE_API_APP_ID, SHOPEE_API_SECRET,
-#   AMAZON_AFFILIATE_TAG (ex.: lin63-20)
-# Amazon — plano B: ofertas da lista curada em data/amazon-deals.json
+#   AMAZON_AFFILIATE_TAG (ex.: lin63-20),
+#   FIRECRAWL_API_KEY (secret — busca da Amazon, plano C; sem ela, o bot
+#   usa a lista curada data/amazon-deals.json)
+# Amazon — plano C: busca via Firecrawl Cloud (src/amazon/firecrawl.ts);
+# plano B: ofertas da lista curada em data/amazon-deals.json
 # (conferida no navegador); o bot só anexa ?tag= a cada link.
 # Brindes grátis (Epic + GamerPower, em PT-BR):
 #   FREEBIE_SOURCES, FREEBIE_MAX_PER_RUN (vars),
@@ -61,6 +64,7 @@ jobs:
           SHOPEE_API_APP_ID: ${{ secrets.SHOPEE_API_APP_ID }}
           SHOPEE_API_SECRET: ${{ secrets.SHOPEE_API_SECRET }}
           AMAZON_AFFILIATE_TAG: ${{ secrets.AMAZON_AFFILIATE_TAG }}
+          FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
           FREEBIE_SOURCES: ${{ vars.FREEBIE_SOURCES }}
           FREEBIE_MAX_PER_RUN: ${{ vars.FREEBIE_MAX_PER_RUN }}
           MYMEMORY_EMAIL: ${{ secrets.MYMEMORY_EMAIL }}
