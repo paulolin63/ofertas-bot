@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getClientCredentialsToken } from "../src/ml/auth.ts";
+import { getClientCredentialsToken, getRefreshTokenAccess } from "../src/ml/auth.ts";
 import { searchMl } from "../src/ml/search.ts";
 
 type FetchStub = typeof fetch;
@@ -52,4 +52,63 @@ test("searchMl envia Authorization Bearer quando há token, e omite sem token", 
   assert.equal(seen[0]?.Authorization, "Bearer tok123");
   await searchMl("garmin", 50, stub);
   assert.equal(seen[1]?.Authorization, undefined);
+});
+
+test("refresh_token: POST com grant_type=refresh_token devolve access_token sem rotação", async () => {
+  let seenInit: RequestInit | undefined;
+  const stub: FetchStub = (async (_url: string | URL | Request, init?: RequestInit) => {
+    seenInit = init;
+    return jsonResponse({ access_token: "user-tok", token_type: "Bearer", expires_in: 21600 });
+  }) as FetchStub;
+
+  const result = await getRefreshTokenAccess("ID1", "SECRET1", "REFRESH-OLD", stub);
+  assert.equal(result.accessToken, "user-tok");
+  assert.equal(result.refreshTokenRotated, false);
+  const body = new URLSearchParams(String(seenInit?.body ?? ""));
+  assert.equal(body.get("grant_type"), "refresh_token");
+  assert.equal(body.get("client_id"), "ID1");
+  assert.equal(body.get("client_secret"), "SECRET1");
+  assert.equal(body.get("refresh_token"), "REFRESH-OLD");
+});
+
+test("refresh_token: resposta com refresh_token diferente marca rotação", async () => {
+  const stub: FetchStub = (async () =>
+    jsonResponse({
+      access_token: "user-tok",
+      refresh_token: "REFRESH-NEW",
+      expires_in: 21600,
+    })) as FetchStub;
+
+  const result = await getRefreshTokenAccess("ID1", "SECRET1", "REFRESH-OLD", stub);
+  assert.equal(result.accessToken, "user-tok");
+  assert.equal(result.refreshTokenRotated, true);
+});
+
+test("refresh_token: resposta com o mesmo refresh_token não marca rotação", async () => {
+  const stub: FetchStub = (async () =>
+    jsonResponse({
+      access_token: "user-tok",
+      refresh_token: "REFRESH-OLD",
+      expires_in: 21600,
+    })) as FetchStub;
+
+  const result = await getRefreshTokenAccess("ID1", "SECRET1", "REFRESH-OLD", stub);
+  assert.equal(result.refreshTokenRotated, false);
+});
+
+test("refresh_token: erro HTTP vira exceção sem vazar o token na mensagem", async () => {
+  const stub: FetchStub = (async () => jsonResponse({ error: "invalid_grant" }, 400)) as FetchStub;
+  await assert.rejects(
+    () => getRefreshTokenAccess("ID1", "SECRET1", "REFRESH-SECRET-VALUE", stub),
+    (error: Error) => {
+      assert.match(error.message, /ML token falhou \(400\)/);
+      assert.ok(!error.message.includes("REFRESH-SECRET-VALUE"));
+      return true;
+    },
+  );
+});
+
+test("refresh_token: resposta sem access_token vira exceção", async () => {
+  const stub: FetchStub = (async () => jsonResponse({ token_type: "Bearer" })) as FetchStub;
+  await assert.rejects(() => getRefreshTokenAccess("ID1", "SECRET1", "REFRESH-OLD", stub), /sem access_token/);
 });
