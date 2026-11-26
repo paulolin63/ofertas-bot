@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-25T20:26:15.622Z",
+  "updatedAt": "2026-11-26T20:05:32.015Z",
   "delivered": [
     "https://bexx.io/post/swift-death-of-statelessness/",
     "https://gpu-demo-gallery.pages.dev/",
@@ -14,6 +14,12 @@
     "https://scottaaronson.blog/?p=10379",
     "https://huggingface.co/blog/allenai/where-scientists-draw-the-line-on-ai-agents",
     "https://github.blog/ai-and-ml/github-copilot/how-to-choose-the-next-safe-step-in-application-modernization/",
-    "https://huggingface.co/blog/ibm-research/an-indic-voice-agent-with-cuga"
+    "https://huggingface.co/blog/ibm-research/an-indic-voice-agent-with-cuga",
+    "https://techcrunch.com/2026/11/26/nvidia-hits-pause-on-chip-shipments-to-southeast-asia/",
+    "https://www.science.org/content/blog-post/george-whitesides-1939-2026",
+    "https://krebsonsecurity.com/2026/11/cto-of-ransomwarehelp-indicted-for-wire-fraud/",
+    "https://techcrunch.com/2026/11/26/as-anthropic-ipos-grand-theft-auto-vi-proves-why-efficiency-isnt-a-virtue/",
+    "https://huggingface.co/blog/ggml-org/llamacpp-amd-bench",
+    "https://huggingface.co/blog/nvidia/building-on-nemotron-35-parse-open-data-fine-tunin"
   ]
 }
