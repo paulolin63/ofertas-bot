@@ -8,6 +8,8 @@ export interface BotConfig {
   mlAffiliateLabel: string;
   mlClientId: string;
   mlClientSecret: string;
+  /** Refresh token do usuário (Authorization Code + offline_access). */
+  mlRefreshToken: string;
   shopeeAppId: string;
   shopeeSecret: string;
   amazonAffiliateTag: string;
@@ -104,6 +106,7 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): BotConfig {
     mlAffiliateLabel: str("ML_AFFILIATE_LABEL", "ofertas-bot"),
     mlClientId: env.ML_CLIENT_ID ?? "",
     mlClientSecret: env.ML_CLIENT_SECRET ?? "",
+    mlRefreshToken: env.ML_REFRESH_TOKEN ?? "",
     shopeeAppId: env.SHOPEE_API_APP_ID ?? "",
     shopeeSecret: env.SHOPEE_API_SECRET ?? "",
     amazonAffiliateTag: env.AMAZON_AFFILIATE_TAG ?? "",
