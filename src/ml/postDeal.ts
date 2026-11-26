@@ -24,6 +24,8 @@ const ML_HOSTS = [
   "mercadolivre.com",
   "mercadolibre.com.br",
   "mercadolibre.com",
+  // Encurtador oficial do ML (links do gerador de links, ex.: meli.la/1gif4Nv).
+  "meli.la",
 ];
 
 export interface ManualMlDealInput {
@@ -94,9 +96,11 @@ export function extractMlItemId(rawUrl: string): string {
 function isShortAffiliateLink(rawUrl: string): boolean {
   try {
     const parsed = new URL(rawUrl);
+    const host = parsed.hostname.toLowerCase();
+    // Shortlink do gerador oficial (meli.la/...) já carrega a atribuição.
+    if (host === "meli.la" || host.endsWith(".meli.la")) return true;
     return (
-      (parsed.hostname.toLowerCase() === "mercadolivre.com" ||
-        parsed.hostname.toLowerCase() === "www.mercadolivre.com") &&
+      (host === "mercadolivre.com" || host === "www.mercadolivre.com") &&
       parsed.pathname.startsWith("/sec/")
     );
   } catch {
