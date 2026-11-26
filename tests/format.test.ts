@@ -30,10 +30,20 @@ test("mensagem traz desconto, preços e selo de afiliado", () => {
   assert.match(text, /Ver oferta/);
 });
 
-test("sem preço original, mostra só o preço atual", () => {
+test("sem preço original, mostra só o preço atual e nunca exibe 0% OFF", () => {
   const text = formatDealMessage(deal({ originalPrice: null, discountPct: 0 }));
   assert.match(text, /R\$ 399,90/);
   assert.doesNotMatch(text, /De <s>/);
+  assert.doesNotMatch(text, /\b0% OFF/);
+  assert.match(text, /<b>OFERTA<\/b>/);
+});
+
+test("com discountUnknown, exibe OFERTA em vez de 0% OFF", () => {
+  const text = formatDealMessage(
+    deal({ store: "amazon", originalPrice: null, discountPct: 0, discountUnknown: true }),
+  );
+  assert.doesNotMatch(text, /\b0% OFF/);
+  assert.match(text, /🔥 <b>OFERTA<\/b> —/);
 });
 
 test("título longo é cortado e a legenda respeita 1024 caracteres", () => {
@@ -41,7 +51,13 @@ test("título longo é cortado e a legenda respeita 1024 caracteres", () => {
   assert.ok(text.length <= 1024);
 });
 
-test("HTML no título é escapado", () => {
-  const text = formatDealMessage(deal({ title: "<b>teste</b> & promoção" }));
-  assert.match(text, /&lt;b&gt;teste&lt;\/b&gt; &amp; promoção/);
+test("HTML no título e na URL é escapado", () => {
+  const text = formatDealMessage(
+    deal({
+      title: '<b>teste</b> & "promoção"',
+      url: 'https://www.mercadolivre.com.br/x?a=1&b="2"',
+    }),
+  );
+  assert.match(text, /&lt;b&gt;teste&lt;\/b&gt; &amp; &quot;promoção&quot;/);
+  assert.match(text, /href="https:\/\/www\.mercadolivre\.com\.br\/x\?a=1&amp;b=&quot;2&quot;"/);
 });

@@ -1,11 +1,19 @@
 import { loadConfig, type BotConfig } from "../config.ts";
 import { getClientCredentialsToken } from "../ml/auth.ts";
 import { searchMl } from "../ml/search.ts";
-import { mlItemToDeal, pickDeals, type Deal } from "../ml/deals.ts";
+import {
+  compareDeals,
+  isQualityDeal,
+  mlItemToDeal,
+  pickDeals,
+  rotateStoreOrder,
+  type Deal,
+  type DealQualityOptions,
+} from "../ml/deals.ts";
 import { searchProductOffers } from "../shopee/api.ts";
 import { shopeeOfferToDeal } from "../shopee/deals.ts";
 import { loadAmazonSeedDeals } from "../amazon/deals.ts";
-import { scrapeAmazonSearch } from "../amazon/firecrawl.ts";
+import { collectAmazonWithCache } from "../amazon/cache.ts";
 import {
   collectFreebies,
   formatFreebieMessage,
@@ -14,7 +22,7 @@ import {
 import { sendMessage, sendPhoto } from "../telegram/client.ts";
 import { formatDealMessage } from "../telegram/format.ts";
 import { PostedDb } from "../store/db.ts";
-import { titleDedupKey } from "../store/titleKey.ts";
+import { isSimilarTitle } from "../store/titleKey.ts";
 import {
   aiTipKey,
   formatAiTipMessage,
@@ -35,6 +43,7 @@ export interface RunStats {
   eligible: number;
   posted: number;
   skippedAlreadyPosted: number;
+  skippedLowQuality: number;
   freebiesFound: number;
   freebiesPosted: number;
   aiTipsPosted: number;
@@ -97,28 +106,24 @@ async function collectShopeeDeals(config: BotConfig): Promise<Deal[]> {
   return deals;
 }
 
-async function collectAmazonDeals(config: BotConfig): Promise<Deal[]> {
+async function collectAmazonDeals(config: BotConfig, now: Date): Promise<Deal[]> {
   if (!config.amazonAffiliateTag) {
     console.warn("[amazon] AMAZON_AFFILIATE_TAG não configurado — loja Amazon ignorada.");
     return [];
   }
-  // Plano C: busca via Firecrawl Cloud (API) — a busca pública direta é
-  // bloqueada em datacenter e a PA-API exige vendas qualificadas.
+  // Plano C: busca via Firecrawl Cloud (API) com cache diário por keyword
+  // (data/amazon-cache.json) para economizar créditos entre as 4 execuções/dia.
   if (config.firecrawlApiKey) {
-    const deals: Deal[] = [];
-    for (const keyword of config.keywords) {
-      try {
-        const found = await scrapeAmazonSearch(
-          keyword,
-          config.firecrawlApiKey,
-          config.amazonAffiliateTag,
-        );
-        deals.push(...found);
-      } catch (error) {
-        console.error(`[amazon] busca Firecrawl "${keyword}" falhou:`, (error as Error).message);
-      }
-    }
-    console.log(`[amazon] ${deals.length} oferta(s) via Firecrawl.`);
+    const { deals, scraped, cacheHits } = await collectAmazonWithCache({
+      dataDir: config.dataDir,
+      keywords: config.keywords,
+      apiKey: config.firecrawlApiKey,
+      tag: config.amazonAffiliateTag,
+      now,
+    });
+    console.log(
+      `[amazon] ${deals.length} oferta(s) via Firecrawl (${scraped} raspada(s), ${cacheHits} do cache diário).`,
+    );
     return deals;
   }
   // Sem FIRECRAWL_API_KEY, volta ao plano B: lista curada.
@@ -140,6 +145,7 @@ export async function runJob(config: BotConfig, now: Date = new Date()): Promise
     eligible: 0,
     posted: 0,
     skippedAlreadyPosted: 0,
+    skippedLowQuality: 0,
     freebiesFound: 0,
     freebiesPosted: 0,
     aiTipsPosted: 0,
@@ -182,24 +188,53 @@ export async function runJob(config: BotConfig, now: Date = new Date()): Promise
   if (wantDeals) {
     if (effectiveConfig.stores.includes("ml")) found.push(...(await collectMlDeals(effectiveConfig)));
     if (effectiveConfig.stores.includes("shopee")) found.push(...(await collectShopeeDeals(effectiveConfig)));
-    if (effectiveConfig.stores.includes("amazon")) found.push(...(await collectAmazonDeals(effectiveConfig)));
+    if (effectiveConfig.stores.includes("amazon")) found.push(...(await collectAmazonDeals(effectiveConfig, now)));
   }
   stats.found = found.length;
 
-  // Dedup por item E por título normalizado: o mesmo produto genérico
-  // de vendedores diferentes (shopId/itemId distintos) não volta a
-  // postar dentro da janela de 30 dias (ver titleKey.ts).
-  const seenTitles = db.titleKeySet();
-  const fresh = found.filter((d) => {
-    const tKey = titleDedupKey(d.title);
-    if (db.has(d.key) || seenTitles.has(tKey)) {
+  const qualityOpts: DealQualityOptions = {
+    minPrice: config.minPrice,
+    maxDiscountPct: config.maxDiscountPct,
+    minRating: config.minRating,
+    minSales: config.minSales,
+  };
+
+  // 1) Dedup contra o histórico já postado (chave exata + similaridade de título).
+  // 2) Filtro de qualidade antes do dedup intra-lote (para anúncio ruim não
+  //    bloquear um anúncio bom do mesmo produto).
+  // 3) Dedup intra-lote ordenado pela melhor oferta (desconto/avaliação/vendas).
+  const historyTitles = db.postedDealTitles();
+  const qualityFresh: Deal[] = [];
+  for (const d of found) {
+    if (db.has(d.key) || historyTitles.some((t) => isSimilarTitle(t, d.title))) {
       stats.skippedAlreadyPosted += 1;
-      return false;
+      continue;
     }
-    seenTitles.add(tKey);
-    return true;
+    if (!isQualityDeal(d, qualityOpts)) {
+      stats.skippedLowQuality += 1;
+      continue;
+    }
+    qualityFresh.push(d);
+  }
+
+  const batchTitles: string[] = [];
+  const seenKeys = new Set<string>();
+  const fresh: Deal[] = [];
+  for (const d of [...qualityFresh].sort(compareDeals)) {
+    if (seenKeys.has(d.key) || batchTitles.some((t) => isSimilarTitle(t, d.title))) {
+      stats.skippedAlreadyPosted += 1;
+      continue;
+    }
+    seenKeys.add(d.key);
+    batchTitles.push(d.title);
+    fresh.push(d);
+  }
+
+  const picked = pickDeals(fresh, config.minDiscountPct, config.maxPostsPerRun, {
+    ...qualityOpts,
+    rotateStores: true,
+    storeOrder: rotateStoreOrder(effectiveConfig.stores, now),
   });
-  const picked = pickDeals(fresh, config.minDiscountPct, config.maxPostsPerRun);
   stats.eligible = picked.length;
 
   if (!config.dryRun && (!config.telegramBotToken || !config.telegramChatId)) {

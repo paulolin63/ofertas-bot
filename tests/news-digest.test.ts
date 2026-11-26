@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseFeed, selectNewItems } from "../src/news/digest.ts";
+import { buildDigest, parseFeed, selectNewItems } from "../src/news/digest.ts";
 
 const sampleFeed = `<?xml version="1.0"?>
 <rss><channel><item>
@@ -50,4 +50,37 @@ test("selectNewItems filters old and previously sent stories and caps items per 
     "https://example.com/A/2",
     "https://example.com/B/4",
   ]);
+});
+
+test("buildDigest envia MYMEMORY_EMAIL no parâmetro de (não key)", async () => {
+  const prevEmail = process.env.MYMEMORY_EMAIL;
+  const realFetch = globalThis.fetch;
+  let seenUrl = "";
+  process.env.MYMEMORY_EMAIL = "digest@example.com";
+  globalThis.fetch = (async (url: string | URL | Request) => {
+    seenUrl = String(url);
+    return new Response(JSON.stringify({ responseData: { translatedText: "翻譯測試" } }));
+  }) as unknown as typeof fetch;
+  try {
+    const out = await buildDigest(
+      [
+        {
+          source: "OpenAI News",
+          title: "Test headline",
+          link: "https://example.com/1",
+          summary: "",
+          publishedAt: new Date("2026-11-25T10:00:00.000Z"),
+        },
+      ],
+      new Date("2026-11-25T12:00:00.000Z"),
+    );
+    assert.ok(out.includes("翻譯測試"));
+    const parsed = new URL(seenUrl);
+    assert.equal(parsed.searchParams.get("de"), "digest@example.com");
+    assert.equal(parsed.searchParams.get("key"), null);
+  } finally {
+    globalThis.fetch = realFetch;
+    if (prevEmail === undefined) delete process.env.MYMEMORY_EMAIL;
+    else process.env.MYMEMORY_EMAIL = prevEmail;
+  }
 });

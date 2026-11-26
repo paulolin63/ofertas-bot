@@ -17,6 +17,10 @@ export interface BotConfig {
   myMemoryEmail: string;
   keywords: string[];
   minDiscountPct: number;
+  maxDiscountPct?: number;
+  minPrice?: number;
+  minRating?: number;
+  minSales?: number;
   maxPostsPerRun: number;
   stores: Array<"ml" | "shopee" | "amazon">;
   dataDir: string;
@@ -109,6 +113,10 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): BotConfig {
     myMemoryEmail: env.MYMEMORY_EMAIL ?? "",
     keywords,
     minDiscountPct: num("DEAL_MIN_DISCOUNT_PCT", 20),
+    maxDiscountPct: num("DEAL_MAX_DISCOUNT_PCT", 85),
+    minPrice: num("DEAL_MIN_PRICE", 10),
+    minRating: num("DEAL_MIN_RATING", 4),
+    minSales: num("DEAL_MIN_SALES", 10),
     maxPostsPerRun:
       args.max !== undefined && Number.isFinite(args.max)
         ? args.max

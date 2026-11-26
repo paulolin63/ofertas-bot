@@ -31,6 +31,7 @@
 
 import { amazonSeedToDeal } from "./deals.ts";
 import type { Deal } from "../ml/deals.ts";
+import { FIRECRAWL_FETCH_TIMEOUT_MS, withTimeout } from "../http.ts";
 
 export const FIRECRAWL_API_URL = "https://api.firecrawl.dev/v2/scrape";
 export const AMAZON_SEARCH_URL = "https://www.amazon.com.br/s";
@@ -125,14 +126,20 @@ export async function scrapeAmazonSearch(
   limit = 20,
 ): Promise<Deal[]> {
   const url = `${AMAZON_SEARCH_URL}?k=${encodeURIComponent(keyword)}`;
-  const res = await fetchFn(FIRECRAWL_API_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ url, formats: ["markdown"] }),
-  });
+  const res = await fetchFn(
+    FIRECRAWL_API_URL,
+    withTimeout(
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ url, formats: ["markdown"] }),
+      },
+      FIRECRAWL_FETCH_TIMEOUT_MS,
+    ),
+  );
   if (!res.ok) throw new Error(`Firecrawl falhou (${res.status})`);
   const json = (await res.json()) as FirecrawlScrapeResponse;
   if (json.success === false) throw new Error(`Firecrawl erro: ${json.error ?? "sem detalhe"}`);

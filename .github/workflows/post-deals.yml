@@ -4,30 +4,28 @@
 # também nos runners do GitHub Actions (testado 2026-11-16, 5/5 keywords).
 # Tentativa B (em teste): cada execução emite um access_token via
 # client_credentials (ML_CLIENT_ID/ML_CLIENT_SECRET) e busca autenticada —
-# ver src/ml/auth.ts. Se não destravar, o job da Shopee continua
-# funcionando (a API da Shopee responde normalmente de qualquer lugar).
+# ver src/ml/auth.ts. Para postar ofertas do ML manualmente, use o workflow
+# `.github/workflows/post-ml-deal.yml`.
 #
 # Segredos necessários no repositório (Settings → Secrets → Actions):
 #   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, ML_AFFILIATE_TAG,
 #   ML_CLIENT_ID, ML_CLIENT_SECRET,
 #   SHOPEE_API_APP_ID, SHOPEE_API_SECRET,
 #   AMAZON_AFFILIATE_TAG (ex.: lin63-20),
-#   FIRECRAWL_API_KEY (secret — busca da Amazon, plano C; sem ela, o bot
-#   usa a lista curada data/amazon-deals.json)
-# Amazon — plano C: busca via Firecrawl Cloud (src/amazon/firecrawl.ts);
-# plano B: ofertas da lista curada em data/amazon-deals.json
-# (conferida no navegador); o bot só anexa ?tag= a cada link.
+#   FIRECRAWL_API_KEY (secret — busca da Amazon, plano C com cache diário em
+#   data/amazon-cache.json; sem ela, o bot usa data/amazon-deals.json)
 # Brindes grátis (Epic + GamerPower, em PT-BR):
 #   FREEBIE_SOURCES, FREEBIE_MAX_PER_RUN (vars),
-#   MYMEMORY_EMAIL (secret, opcional — tradução EN→PT-BR).
+#   MYMEMORY_EMAIL (secret, opcional — parâmetro `de` na API MyMemory).
 # Opcional (com defaults no .env.example): DEAL_KEYWORDS, DEAL_MIN_DISCOUNT_PCT,
+# DEAL_MAX_DISCOUNT_PCT, DEAL_MIN_PRICE, DEAL_MIN_RATING, DEAL_MIN_SALES,
 # DEAL_MAX_POSTS_PER_RUN, DEAL_STORES, ML_AFFILIATE_LABEL.
 #
-# O data/posted.json é commitado de volta a cada execução para deduplicar
-# entre runs (o runner é efêmero — sem isso, a mesma oferta seria repostada).
+# O data/posted.json e o data/amazon-cache.json são commitados de volta a cada
+# execução real para deduplicar entre runs e economizar créditos do Firecrawl.
 # Calendário semanal de temas (src/theme.ts): cada dia busca as keywords
-# do tema e a 1ª execução do dia anuncia o tema no canal; sábado só
-# jogos grátis, domingo só IA grátis (anúncio, sem post automático).
+# do tema e a 1ª execução do dia anuncia o tema no canal; sábado jogos grátis
+# (com ofertas de reserva), domingo IA grátis (dicas curadas + ofertas de reserva).
 
 name: post-deals
 
@@ -45,6 +43,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: post-deals
+  cancel-in-progress: false
+
 jobs:
   post:
     runs-on: ubuntu-latest
@@ -55,6 +57,7 @@ jobs:
           node-version: "22"
       - name: Run bot
         env:
+          DRY_RUN: ${{ inputs.dry_run }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           ML_AFFILIATE_TAG: ${{ secrets.ML_AFFILIATE_TAG }}
@@ -70,13 +73,22 @@ jobs:
           MYMEMORY_EMAIL: ${{ secrets.MYMEMORY_EMAIL }}
           DEAL_KEYWORDS: ${{ vars.DEAL_KEYWORDS }}
           DEAL_MIN_DISCOUNT_PCT: ${{ vars.DEAL_MIN_DISCOUNT_PCT }}
+          DEAL_MAX_DISCOUNT_PCT: ${{ vars.DEAL_MAX_DISCOUNT_PCT }}
+          DEAL_MIN_PRICE: ${{ vars.DEAL_MIN_PRICE }}
+          DEAL_MIN_RATING: ${{ vars.DEAL_MIN_RATING }}
+          DEAL_MIN_SALES: ${{ vars.DEAL_MIN_SALES }}
           DEAL_MAX_POSTS_PER_RUN: ${{ vars.DEAL_MAX_POSTS_PER_RUN }}
           DEAL_STORES: ${{ vars.DEAL_STORES }}
-        run: node src/index.ts $([ "${{ inputs.dry_run }}" = "true" ] && echo --dry-run)
-      - name: Persist posted history
+        run: node src/index.ts $([ "$DRY_RUN" = "true" ] && echo --dry-run)
+      - name: Persist posted history and daily cache
+        if: success() && inputs.dry_run != true
         run: |
           git config user.name "ofertas-bot"
           git config user.email "ofertas-bot@users.noreply.github.com"
-          git add -f data/posted.json || true
-          git diff --cached --quiet || git commit -m "chore: update posted history [skip ci]"
-          git push || true
+          [ -f data/posted.json ] && git add -f data/posted.json || true
+          [ -f data/amazon-cache.json ] && git add -f data/amazon-cache.json || true
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: update posted history [skip ci]"
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME:-main}"
+            git push
+          fi

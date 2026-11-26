@@ -34,6 +34,8 @@ interface EpicElement {
   } | null;
 }
 
+import { withTimeout } from "../http.ts";
+
 const EPIC_URL =
   "https://store-site-backend-static-ipv4.ak.epicgames.com/freeGamesPromotions?locale=pt-BR&country=BR&allowCountries=BR";
 
@@ -75,9 +77,12 @@ export async function fetchEpicFreeGames(
   fetchFn: typeof fetch = fetch,
   now: Date = new Date(),
 ): Promise<EpicGame[]> {
-  const res = await fetchFn(EPIC_URL, {
-    headers: { "User-Agent": "ofertas-bot/0.1 (+https://github.com/paulolin63/ofertas-bot)" },
-  });
+  const res = await fetchFn(
+    EPIC_URL,
+    withTimeout({
+      headers: { "User-Agent": "ofertas-bot/0.1 (+https://github.com/paulolin63/ofertas-bot)" },
+    }),
+  );
   if (!res.ok) throw new Error(`Epic HTTP ${res.status}`);
   const data = (await res.json()) as {
     data?: { Catalog?: { searchStore?: { elements?: EpicElement[] } } };

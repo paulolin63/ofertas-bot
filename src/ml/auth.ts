@@ -16,6 +16,8 @@
  * não funcionar para a busca.
  */
 
+import { withTimeout } from "../http.ts";
+
 const TOKEN_URL = "https://api.mercadolibre.com/oauth/token";
 
 export interface MlTokenResponse {
@@ -36,14 +38,17 @@ export async function getClientCredentialsToken(
     client_id: clientId,
     client_secret: clientSecret,
   });
-  const res = await fetchFn(TOKEN_URL, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: body.toString(),
-  });
+  const res = await fetchFn(
+    TOKEN_URL,
+    withTimeout({
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: body.toString(),
+    }),
+  );
   if (!res.ok) {
     throw new Error(`ML token falhou (${res.status})`);
   }

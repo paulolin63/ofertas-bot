@@ -5,3 +5,4 @@ data/*.json
 !data/.gitkeep
 !data/posted.json
 !data/news-digest-posted.json
+!data/amazon-cache.json

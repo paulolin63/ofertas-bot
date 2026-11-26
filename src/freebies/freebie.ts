@@ -4,6 +4,7 @@ import {
   type GamerPowerGiveaway,
 } from "./gamerpower.ts";
 import { translateEnToPtBr } from "./translate.ts";
+import { escapeHtml } from "../telegram/format.ts";
 
 export interface Freebie {
   source: "epic" | "gamerpower";
@@ -53,14 +54,14 @@ function truncate(text: string, max: number): string {
  */
 export function formatFreebieMessage(f: Freebie): string {
   const lines: string[] = [];
-  lines.push(`🎁 <b>GRÁTIS</b> — ${truncate(f.title, 120)}`);
+  lines.push(`🎁 <b>GRÁTIS</b> — ${escapeHtml(truncate(f.title, 120))}`);
   if (f.description) {
     lines.push("");
-    lines.push(truncate(f.description, 200));
+    lines.push(escapeHtml(truncate(f.description, 200)));
   }
   lines.push("");
   if (f.worth) {
-    lines.push(`💰 De <s>${normalizeSpace(f.worth)}</s> por <b>GRÁTIS</b>`);
+    lines.push(`💰 De <s>${escapeHtml(normalizeSpace(f.worth))}</s> por <b>GRÁTIS</b>`);
   } else {
     lines.push(`💰 <b>GRÁTIS</b>`);
   }
@@ -68,7 +69,7 @@ export function formatFreebieMessage(f: Freebie): string {
   if (end) lines.push(`⏰ Até ${end}`);
   lines.push(`🏬 ${f.source === "epic" ? "Epic Games" : "GamerPower"}`);
   lines.push("");
-  lines.push(`👉 <a href="${f.url}">Pegar grátis</a>`);
+  lines.push(`👉 <a href="${escapeHtml(f.url)}">Pegar grátis</a>`);
   lines.push(`📌 Gratuito — sem link de afiliado.`);
   const text = lines.join("\n");
   return text.length > 1024 ? `${text.slice(0, 1021)}…` : text;

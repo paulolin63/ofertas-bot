@@ -1,0 +1,83 @@
+# Publicação semi-automática de ofertas do Mercado Livre.
+#
+# Como a busca pública do ML retorna 403 em IPs de datacenter e aciona
+# reCAPTCHA no Firecrawl, este workflow permite colar um produto visto no
+# navegador/app do ML, gerar o link de afiliado, postar no Telegram e
+# registrar em data/posted.json para deduplicação.
+
+name: post-ml-deal
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Link do produto no Mercado Livre (ou shortlink /sec/...)"
+        type: string
+        required: true
+      title:
+        description: "Título do produto"
+        type: string
+        required: true
+      price:
+        description: "Preço atual em R$ (ex.: 199,90 ou 199.90)"
+        type: string
+        required: true
+      original_price:
+        description: "Preço original riscado em R$ (opcional, ex.: 299,90)"
+        type: string
+        required: false
+        default: ""
+      image_url:
+        description: "URL da imagem do produto (opcional)"
+        type: string
+        required: false
+        default: ""
+      force:
+        description: "Postar mesmo se já constar em data/posted.json"
+        type: boolean
+        default: false
+      dry_run:
+        description: "Dry-run (não posta no Telegram, só mostra a prévia)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: post-ml-deal
+  cancel-in-progress: false
+
+jobs:
+  post-ml:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Post ML deal
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ML_AFFILIATE_TAG: ${{ secrets.ML_AFFILIATE_TAG }}
+          ML_AFFILIATE_LABEL: ${{ vars.ML_AFFILIATE_LABEL }}
+          ML_DEAL_URL: ${{ inputs.url }}
+          ML_DEAL_TITLE: ${{ inputs.title }}
+          ML_DEAL_PRICE: ${{ inputs.price }}
+          ML_DEAL_ORIGINAL_PRICE: ${{ inputs.original_price }}
+          ML_DEAL_IMAGE_URL: ${{ inputs.image_url }}
+          ML_DEAL_FORCE: ${{ inputs.force }}
+          ML_DEAL_DRY_RUN: ${{ inputs.dry_run }}
+        run: node src/ml/postDeal.ts
+      - name: Persist posted history
+        if: success() && inputs.dry_run != true
+        run: |
+          git config user.name "ofertas-bot"
+          git config user.email "ofertas-bot@users.noreply.github.com"
+          git add -f data/posted.json || true
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: update posted history (ml manual) [skip ci]"
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME:-main}"
+            git push
+          fi
