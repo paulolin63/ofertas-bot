@@ -55,7 +55,7 @@ A busca pública do ML devolve 403 em IPs de datacenter — testado na VM e nos 
 1. Em [developers.mercadolivre.com.br](https://developers.mercadolivre.com.br/), logado na sua conta do ML, crie uma aplicação `ofertas-bot` (Redirect URL: `https://localhost:8080/callback`; scopes: read + offline_access).
 2. Anote o Client ID e o Secret Key e guarde-os como secrets `ML_CLIENT_ID` / `ML_CLIENT_SECRET` no repositório.
 3. Cada execução do bot emite um access_token (`client_credentials`, válido 6h) e o envia como Bearer na busca — ver `src/ml/auth.ts`.
-4. **Fluxo semi-automático (quando a busca via API continuar 403)**: em **Actions → `post-ml-deal` → Run workflow**, cole o link do produto (ou shortlink `/sec/...`), título, preço (ex.: `199,90`), preço original opcional e URL da foto opcional. O workflow gera o link de afiliado, checa duplicidade em `data/posted.json`, posta no Telegram e commita o histórico com `git pull --rebase`. Use `dry_run: true` para conferir a prévia antes de publicar.
+4. **Fluxo semi-automático (quando a busca via API continuar 403)**: em **Actions → `post-ml-deal` → Run workflow**, cole o link do produto (ou shortlink `/sec/...` ou `meli.la`), título, preço (ex.: `199,90`), preço original opcional e URL da foto opcional. O workflow gera o link de afiliado, checa duplicidade em `data/posted.json`, posta no Telegram e commita o histórico com `git pull --rebase`. Use `dry_run: true` para conferir a prévia antes de publicar.
 
 ## 7. Testar antes de automatizar
 
