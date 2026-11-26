@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       url:
-        description: "Link do produto no Mercado Livre (ou shortlink /sec/...)"
+        description: "Link do produto no Mercado Livre (ou shortlink /sec/... ou meli.la)"
         type: string
         required: true
       title:
