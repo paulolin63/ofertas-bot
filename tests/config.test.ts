@@ -51,6 +51,12 @@ test("variável numérica inválida usa o padrão", () => {
   });
 });
 
+test("ML refresh token encryption key is loaded from the environment", () => {
+  withEnv({ ML_REFRESH_TOKEN_ENCRYPTION_KEY: "base64-key" }, () => {
+    assert.equal(loadConfig([]).mlRefreshTokenEncryptionKey, "base64-key");
+  });
+});
+
 test("variáveis de qualidade usam padrão quando vazias e respeitam valores definidos", () => {
   withEnv(
     {

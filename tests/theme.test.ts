@@ -64,6 +64,7 @@ function config(partial: Partial<BotConfig> & { dataDir: string }): BotConfig {
     mlClientId: "",
     mlClientSecret: "",
     mlRefreshToken: "",
+    mlRefreshTokenEncryptionKey: "",
     shopeeAppId: "",
     shopeeSecret: "",
     amazonAffiliateTag: "",

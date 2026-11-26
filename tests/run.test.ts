@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { runJob } from "../src/jobs/run.ts";
 import type { BotConfig } from "../src/config.ts";
+import { decryptMlRefreshToken, mlRefreshTokenStorePath } from "../src/ml/tokenStore.ts";
 
 function config(partial: Partial<BotConfig> & { dataDir: string }): BotConfig {
   return {
@@ -15,6 +16,7 @@ function config(partial: Partial<BotConfig> & { dataDir: string }): BotConfig {
     mlClientId: "",
     mlClientSecret: "",
     mlRefreshToken: "",
+    mlRefreshTokenEncryptionKey: "",
     shopeeAppId: "",
     shopeeSecret: "",
     amazonAffiliateTag: "",
@@ -59,6 +61,68 @@ test("runJob coleta os brindes antes de exigir o token do Telegram", async () =>
     // A coleta da Epic aconteceu antes do erro — sem isso, o log do
     // Actions não mostraria os brindes quando o token falta.
     assert.equal(epicHit, true);
+  } finally {
+    globalThis.fetch = realFetch;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("runJob persists rotated ML token before search and does not rewrite it when unchanged", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ofertas-run-ml-token-"));
+  const encryptionKey = Buffer.alloc(32, 0x4a).toString("base64");
+  const storePath = mlRefreshTokenStorePath(dir);
+  const realFetch = globalThis.fetch;
+  let refreshCount = 0;
+  const refreshTokensSent: string[] = [];
+  const searchAuthHeaders: string[] = [];
+  globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+    const requestUrl = String(url);
+    if (requestUrl.endsWith("/oauth/token")) {
+      const params = new URLSearchParams(String(init?.body ?? ""));
+      refreshTokensSent.push(params.get("refresh_token") ?? "");
+      refreshCount += 1;
+      const response = refreshCount === 1
+        ? { access_token: "ACCESS-ONE", refresh_token: "ROTATED-ONE", expires_in: 21_600 }
+        : { access_token: "ACCESS-TWO", expires_in: 21_600 };
+      return new Response(JSON.stringify(response), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (requestUrl.startsWith("https://api.mercadolibre.com/sites/MLB/search")) {
+      const headers = (init?.headers ?? {}) as Record<string, string>;
+      searchAuthHeaders.push(headers.Authorization ?? "");
+      assert.equal(decryptMlRefreshToken(fs.readFileSync(storePath, "utf8"), encryptionKey), "ROTATED-ONE");
+      assert.equal(headers.Authorization, refreshCount === 1 ? "Bearer ACCESS-ONE" : "Bearer ACCESS-TWO");
+      return new Response(JSON.stringify({ results: [] }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    throw new Error(`Unexpected fetch in ML token persistence test: ${requestUrl}`);
+  }) as typeof fetch;
+
+  const cfg = config({
+    dataDir: dir,
+    stores: ["ml"],
+    mlAffiliateTag: "test-tag",
+    mlClientId: "test-client-id",
+    mlClientSecret: "test-client-secret",
+    mlRefreshToken: "BOOTSTRAP-TOKEN",
+    mlRefreshTokenEncryptionKey: encryptionKey,
+    freebieSources: [],
+    dryRun: true,
+  });
+  try {
+    await runJob(cfg, new Date("2026-11-26T12:00:00-03:00"));
+    assert.equal(refreshTokensSent[0], "BOOTSTRAP-TOKEN");
+    assert.ok(searchAuthHeaders.length > 0);
+    const encryptedAfterRotation = fs.readFileSync(storePath, "utf8");
+    assert.ok(!encryptedAfterRotation.includes("ROTATED-ONE"));
+
+    await runJob(cfg, new Date("2026-11-26T16:00:00-03:00"));
+    assert.equal(refreshTokensSent[1], "ROTATED-ONE");
+    assert.equal(fs.readFileSync(storePath, "utf8"), encryptedAfterRotation);
+    assert.ok(searchAuthHeaders.includes("Bearer ACCESS-ONE"));
+    assert.ok(searchAuthHeaders.includes("Bearer ACCESS-TWO"));
   } finally {
     globalThis.fetch = realFetch;
     fs.rmSync(dir, { recursive: true, force: true });

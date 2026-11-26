@@ -1,6 +1,12 @@
+import fs from "node:fs";
 import { loadConfig, type BotConfig } from "../config.ts";
-import { getClientCredentialsToken, getRefreshTokenAccess } from "../ml/auth.ts";
+import { getRefreshTokenAccess } from "../ml/auth.ts";
 import { searchMl } from "../ml/search.ts";
+import {
+  loadMlRefreshToken,
+  mlRefreshTokenStorePath,
+  saveMlRefreshToken,
+} from "../ml/tokenStore.ts";
 import {
   compareDeals,
   isQualityDeal,
@@ -55,50 +61,58 @@ async function collectMlDeals(config: BotConfig): Promise<Deal[]> {
     console.warn("[ml] ML_AFFILIATE_TAG não configurado — loja ML ignorada.");
     return [];
   }
-  // Tentativa A: token do usuário via refresh_token — a busca
-  // /sites/MLB/search devolve 403 com o token client_credentials, porque
-  // o endpoint exige um token autorizado por um usuário (verificado em
-  // dry-run #42, 2026-11-26). O refresh_token dura 6 meses e pode ser
-  // reutilizado, mas cada refresh devolve um refresh_token novo: o bot
-  // NÃO o persiste (sem PAT não há como atualizar o secret), então
-  // apenas avisa no log — ver src/ml/auth.ts. O valor novo nunca é
-  // escrito em log ou arquivo.
-  let accessToken: string | undefined;
-  if (config.mlRefreshToken && config.mlClientId && config.mlClientSecret) {
-    try {
-      const result = await getRefreshTokenAccess(
-        config.mlClientId,
-        config.mlClientSecret,
-        config.mlRefreshToken,
+  if (!config.mlClientId || !config.mlClientSecret) {
+    console.warn("[ml] credenciais do app ML ausentes — loja ML ignorada.");
+    return [];
+  }
+  if (!config.mlRefreshTokenEncryptionKey) {
+    console.error(
+      "[ml] ML_REFRESH_TOKEN_ENCRYPTION_KEY ausente — não vou renovar o token, " +
+        "para evitar perder a rotação. Configure o secret de 32 bytes antes de ativar a busca ML.",
+    );
+    return [];
+  }
+
+  let accessToken: string;
+  try {
+    const hasEncryptedStore = fs.existsSync(mlRefreshTokenStorePath(config.dataDir));
+    const currentRefreshToken = loadMlRefreshToken(
+      config.dataDir,
+      config.mlRefreshTokenEncryptionKey,
+      config.mlRefreshToken,
+    );
+    if (!currentRefreshToken) {
+      console.warn("[ml] ML_REFRESH_TOKEN não configurado — loja ML ignorada.");
+      return [];
+    }
+    const result = await getRefreshTokenAccess(
+      config.mlClientId,
+      config.mlClientSecret,
+      currentRefreshToken,
+    );
+    // Persist immediately after a rotation and before searching. On first use,
+    // also migrate the bootstrap secret into the encrypted store. Only ciphertext
+    // is stored in data/ and committed by the workflow.
+    if (result.refreshTokenRotated || !hasEncryptedStore) {
+      saveMlRefreshToken(
+        config.dataDir,
+        result.refreshToken,
+        config.mlRefreshTokenEncryptionKey,
       );
-      accessToken = result.accessToken;
-      console.log("[ml] token via refresh_token emitido.");
-      if (result.refreshTokenRotated) {
-        console.error(
-          "[ml] ATENÇÃO: o Mercado Livre devolveu um novo refresh_token. " +
-            "Atualize o secret ML_REFRESH_TOKEN no GitHub " +
-            "(paulolin63/ofertas-bot → Settings → Secrets → Actions) — o token " +
-            "antigo pode parar de funcionar. O novo valor NÃO foi salvo em nenhum lugar.",
-        );
-      }
-    } catch (error) {
-      console.error("[ml] token refresh_token falhou:", (error as Error).message);
     }
-  }
-  // Tentativa B (fallback): token da aplicação (client_credentials).
-  // A busca com ele devolve 403 (testado 2026-11-26), mas o bot continua
-  // — as outras lojas não dependem do ML.
-  if (!accessToken && config.mlClientId && config.mlClientSecret) {
-    try {
-      accessToken = await getClientCredentialsToken(config.mlClientId, config.mlClientSecret);
-      console.log("[ml] token client_credentials emitido.");
-    } catch (error) {
-      console.error("[ml] token client_credentials falhou:", (error as Error).message);
+    accessToken = result.accessToken;
+    if (result.refreshTokenRotated) {
+      console.log("[ml] refresh token rotacionado e salvo criptografado.");
+    } else if (!hasEncryptedStore) {
+      console.log("[ml] refresh token inicial salvo criptografado.");
+    } else {
+      console.log("[ml] token de usuário renovado; refresh token não mudou.");
     }
+  } catch (error) {
+    console.error("[ml] OAuth user-token falhou; busca ML ignorada:", (error as Error).message);
+    return [];
   }
-  if (!accessToken) {
-    console.warn("[ml] sem token ML — busca sem autenticação (pode devolver 403 em datacenter).");
-  }
+
   const deals: Deal[] = [];
   for (const keyword of config.keywords) {
     try {

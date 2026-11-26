@@ -44,18 +44,17 @@ git push -u origin main
 
 ## 6. Segredos no GitHub (Settings → Secrets and variables → Actions)
 
-Secrets: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_NEWS_CHAT_ID` (p/ digest privado), `ML_AFFILIATE_TAG`, `ML_CLIENT_ID`, `ML_CLIENT_SECRET`, `SHOPEE_API_APP_ID`, `SHOPEE_API_SECRET`, `AMAZON_AFFILIATE_TAG`, `FIRECRAWL_API_KEY`, `MYMEMORY_EMAIL` (qualquer e-mail válido, enviado via parâmetro `de` do MyMemory para liberar 50 mil caracteres/dia).
+Secrets: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_NEWS_CHAT_ID` (p/ digest privado), `ML_AFFILIATE_TAG`, `ML_CLIENT_ID`, `ML_CLIENT_SECRET`, `ML_REFRESH_TOKEN`, `ML_REFRESH_TOKEN_ENCRYPTION_KEY`, `SHOPEE_API_APP_ID`, `SHOPEE_API_SECRET`, `AMAZON_AFFILIATE_TAG`, `FIRECRAWL_API_KEY`, `MYMEMORY_EMAIL` (qualquer e-mail válido, enviado via parâmetro `de` do MyMemory para liberar 50 mil caracteres/dia).
 
 Variables (opcional): `DEAL_KEYWORDS`, `DEAL_MIN_DISCOUNT_PCT`, `DEAL_MAX_DISCOUNT_PCT`, `DEAL_MIN_PRICE`, `DEAL_MIN_RATING`, `DEAL_MIN_SALES`, `DEAL_MAX_POSTS_PER_RUN`, `DEAL_STORES`, `ML_AFFILIATE_LABEL`, `FREEBIE_SOURCES`, `FREEBIE_MAX_PER_RUN`.
 
 ### Aplicação do ML (`ML_CLIENT_ID` / `ML_CLIENT_SECRET`) e fluxo semi-automático
 
-A busca pública do ML devolve 403 em IPs de datacenter — testado na VM e nos runners do GitHub (2026-11-16) — e o Firecrawl recebe reCAPTCHA na busca do ML.
-
-1. Em [developers.mercadolivre.com.br](https://developers.mercadolivre.com.br/), logado na sua conta do ML, crie uma aplicação `ofertas-bot` (Redirect URL: `https://localhost:8080/callback`; scopes: read + offline_access).
-2. Anote o Client ID e o Secret Key e guarde-os como secrets `ML_CLIENT_ID` / `ML_CLIENT_SECRET` no repositório.
-3. Cada execução do bot emite um access_token (`client_credentials`, válido 6h) e o envia como Bearer na busca — ver `src/ml/auth.ts`.
-4. **Fluxo semi-automático (quando a busca via API continuar 403)**: em **Actions → `post-ml-deal` → Run workflow**, cole o link do produto (ou shortlink `/sec/...` ou `meli.la`), título, preço (ex.: `199,90`), preço original opcional e URL da foto opcional. O workflow gera o link de afiliado, checa duplicidade em `data/posted.json`, posta no Telegram e commita o histórico com `git pull --rebase`. Use `dry_run: true` para conferir a prévia antes de publicar.
+1. Em [developers.mercadolivre.com.br](https://developers.mercadolivre.com.br/), configure a aplicação com a URL de redirecionamento cadastrada e os escopos `read` + `offline_access`; autorize a conta que deve representar o bot e guarde o refresh token inicial como Actions secret `ML_REFRESH_TOKEN`.
+2. Guarde `ML_CLIENT_ID` e `ML_CLIENT_SECRET` como Actions secrets. Gere uma chave aleatória com `openssl rand -base64 32` e salve o resultado como o novo Actions secret `ML_REFRESH_TOKEN_ENCRYPTION_KEY`. Não cole a chave nem o refresh token no código, issues ou logs.
+3. O workflow renova o user token e, se o refresh token mudar, grava somente AES-256-GCM cifrado em `data/ml-refresh-token.enc`; depois o commit ocorre com o `GITHUB_TOKEN` já limitado a `contents: write`. Não é necessário PAT nem permissão adicional de escrita de secrets. Após confirmar que esse arquivo foi commitado numa execução, o secret inicial `ML_REFRESH_TOKEN` pode ser removido.
+4. A busca `/sites/MLB/search` envia o access token de usuário no header `Authorization: Bearer`. O Mercado Livre documenta 403 para problemas de autorização/país; também observamos 403 no endpoint público nesta nuvem, e isso não prova que o código tenha recuperado o acesso. Se o log ainda mostrar 403 após uma execução autenticada, a restrição precisa ser resolvida com a conta/site correto ou com o suporte do Mercado Livre; não há fallback gratuito confiável no bot.
+5. **Fluxo semi-automático (se a API continuar 403)**: em **Actions → `post-ml-deal` → Run workflow**, cole o link do produto (ou shortlink `/sec/...` ou `meli.la`), título, preço (ex.: `199,90`), preço original opcional e URL da foto opcional. O workflow gera o link de afiliado, checa duplicidade em `data/posted.json`, posta no Telegram e commita o histórico com `git pull --rebase`. Use `dry_run: true` para conferir a prévia antes de publicar.
 
 ## 7. Testar antes de automatizar
 

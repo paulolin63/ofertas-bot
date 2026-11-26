@@ -35,7 +35,9 @@ npm start              # executa e posta de verdade
 | `TELEGRAM_NEWS_CHAT_ID` | p/ digest | ID do chat privado para o digest diário de AI/tecnologia |
 | `ML_AFFILIATE_TAG` | p/ ML | Sua etiqueta de afiliado (`matt_tool`) |
 | `ML_AFFILIATE_LABEL` | não | Rótulo de tracking (`matt_word`, padrão `ofertas-bot`) |
-| `ML_CLIENT_ID` / `ML_CLIENT_SECRET` | p/ ML | Credenciais da aplicação em developers.mercadolivre.com.br (token por execução) |
+| `ML_CLIENT_ID` / `ML_CLIENT_SECRET` | p/ ML | Credenciais da aplicação em developers.mercadolivre.com.br |
+| `ML_REFRESH_TOKEN` | p/ ML | Token inicial de usuário OAuth; após a primeira execução, o estado mais novo é lido do arquivo criptografado |
+| `ML_REFRESH_TOKEN_ENCRYPTION_KEY` | p/ ML | Secret base64 de 32 bytes para criptografar o refresh token com AES-256-GCM |
 | `SHOPEE_API_APP_ID` / `SHOPEE_API_SECRET` | p/ Shopee | Credenciais da Affiliate Open API |
 | `AMAZON_AFFILIATE_TAG` | p/ Amazon | Tracking ID do Associates (ex.: `lin63-20`) |
 | `FIRECRAWL_API_KEY` | p/ Amazon C | Chave do Firecrawl Cloud (plano C, com cache diário; sem ela usa `data/amazon-deals.json`) |

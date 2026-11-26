@@ -1,21 +1,17 @@
 # Bot de ofertas — execução agendada (sem servidor).
 #
-# A API pública do Mercado Livre bloqueia IPs de datacenter: 403 nesta VM e
-# também nos runners do GitHub Actions (testado 2026-11-16, 5/5 keywords).
-# Tentativa A (em teste): token do usuário via refresh_token
-# (ML_REFRESH_TOKEN, secret — autorizado por PAULOCLARK em 2026-11-26).
-# A busca /sites/MLB/search devolve 403 com o token client_credentials,
-# porque o endpoint exige um token autorizado por um usuário (dry-run #42,
-# 2026-11-26). Fallback: client_credentials (ML_CLIENT_ID/ML_CLIENT_SECRET)
-# e depois busca sem autenticação — ver src/ml/auth.ts. O refresh_token
-# dura 6 meses e pode ser reutilizado, mas cada refresh devolve um novo:
-# o bot apenas avisa no log para atualizar o secret (sem PAT não há como
-# o workflow atualizar o secret sozinho). Para postar ofertas do ML
-# manualmente, use o workflow `.github/workflows/post-ml-deal.yml`.
+# A busca ML usa OAuth autorizado pelo usuário. O endpoint ainda pode devolver
+# 403 por política ou por acesso à conta/site; o job registra apenas detalhes
+# seguros da resposta, sem afirmar que a busca foi liberada.
+# O refresh token mais recente é guardado como AES-256-GCM em
+# data/ml-refresh-token.enc; a chave fica no secret ML_REFRESH_TOKEN_ENCRYPTION_KEY.
+# Para postar ofertas do ML manualmente, use o workflow
+# `.github/workflows/post-ml-deal.yml`.
 #
 # Segredos necessários no repositório (Settings → Secrets → Actions):
 #   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, ML_AFFILIATE_TAG,
 #   ML_CLIENT_ID, ML_CLIENT_SECRET, ML_REFRESH_TOKEN,
+#   ML_REFRESH_TOKEN_ENCRYPTION_KEY (32 bytes, base64; para AES-256-GCM),
 #   SHOPEE_API_APP_ID, SHOPEE_API_SECRET,
 #   AMAZON_AFFILIATE_TAG (ex.: lin63-20),
 #   FIRECRAWL_API_KEY (secret — busca da Amazon, plano C com cache diário em
@@ -71,6 +67,7 @@ jobs:
           ML_CLIENT_ID: ${{ secrets.ML_CLIENT_ID }}
           ML_CLIENT_SECRET: ${{ secrets.ML_CLIENT_SECRET }}
           ML_REFRESH_TOKEN: ${{ secrets.ML_REFRESH_TOKEN }}
+          ML_REFRESH_TOKEN_ENCRYPTION_KEY: ${{ secrets.ML_REFRESH_TOKEN_ENCRYPTION_KEY }}
           SHOPEE_API_APP_ID: ${{ secrets.SHOPEE_API_APP_ID }}
           SHOPEE_API_SECRET: ${{ secrets.SHOPEE_API_SECRET }}
           AMAZON_AFFILIATE_TAG: ${{ secrets.AMAZON_AFFILIATE_TAG }}
@@ -87,6 +84,19 @@ jobs:
           DEAL_MAX_POSTS_PER_RUN: ${{ vars.DEAL_MAX_POSTS_PER_RUN }}
           DEAL_STORES: ${{ vars.DEAL_STORES }}
         run: node src/index.ts $([ "$DRY_RUN" = "true" ] && echo --dry-run)
+      - name: Persist encrypted ML refresh-token state
+        if: always()
+        run: |
+          if [ -f data/ml-refresh-token.enc ]; then
+            git config user.name "ofertas-bot"
+            git config user.email "ofertas-bot@users.noreply.github.com"
+            git add data/ml-refresh-token.enc
+            if ! git diff --cached --quiet; then
+              git commit -m "chore: update encrypted ML refresh token [skip ci]"
+              git pull --rebase --autostash origin "${GITHUB_REF_NAME:-main}"
+              git push
+            fi
+          fi
       - name: Persist posted history and daily cache
         if: success() && inputs.dry_run != true
         run: |

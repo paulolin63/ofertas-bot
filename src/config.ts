@@ -10,6 +10,8 @@ export interface BotConfig {
   mlClientSecret: string;
   /** Refresh token do usuário (Authorization Code + offline_access). */
   mlRefreshToken: string;
+  /** Base64-encoded 32-byte key used to encrypt the rotating refresh token at rest. */
+  mlRefreshTokenEncryptionKey: string;
   shopeeAppId: string;
   shopeeSecret: string;
   amazonAffiliateTag: string;
@@ -107,6 +109,7 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): BotConfig {
     mlClientId: env.ML_CLIENT_ID ?? "",
     mlClientSecret: env.ML_CLIENT_SECRET ?? "",
     mlRefreshToken: env.ML_REFRESH_TOKEN ?? "",
+    mlRefreshTokenEncryptionKey: env.ML_REFRESH_TOKEN_ENCRYPTION_KEY ?? "",
     shopeeAppId: env.SHOPEE_API_APP_ID ?? "",
     shopeeSecret: env.SHOPEE_API_SECRET ?? "",
     amazonAffiliateTag: env.AMAZON_AFFILIATE_TAG ?? "",

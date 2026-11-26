@@ -50,7 +50,7 @@ test("todas as chamadas HTTP externas passam AbortSignal de timeout", async () =
   await sendMessage("tok", "@canal", "teste", makeStub({ ok: true }));
 
   assert.equal(signals.length, 8);
-  for (const sig of signals) {
-    assert.ok(sig instanceof AbortSignal, "fetch precisa receber AbortSignal de timeout");
+  for (const [index, sig] of signals.entries()) {
+    assert.ok(sig instanceof AbortSignal, `fetch #${index + 1} precisa receber AbortSignal de timeout`);
   }
 });
