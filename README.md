@@ -63,7 +63,7 @@ A Amazon bloqueia busca direta a partir de datacenter, e a Product Advertising A
 
 Enquanto a busca automática do ML continuar bloqueada em IPs de datacenter (403) e com reCAPTCHA no Firecrawl, você pode publicar ofertas encontradas no navegador/app pelo workflow **Actions → `post-ml-deal` → Run workflow**:
 
-- Informe `url` (link do produto no ML ou shortlink `/sec/...`), `title`, `price` (aceita `199,90` ou `199.90`), e opcionalmente `original_price`, `image_url`, `force` e `dry_run`.
+- Informe `url` (link do produto no ML ou shortlink `/sec/...` ou `meli.la`), `title`, `price` (aceita `199,90` ou `199.90`), e opcionalmente `original_price`, `image_url`, `force` e `dry_run`.
 - O script (`src/ml/postDeal.ts`) valida a URL, anexa `matt_tool`/`matt_word`, confere deduplicação em `data/posted.json`, posta no Telegram e commita o histórico de volta.
 
 ## Brindes grátis (Epic + GamerPower, em PT-BR)
