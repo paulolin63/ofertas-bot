@@ -1,5 +1,5 @@
 import { loadConfig, type BotConfig } from "../config.ts";
-import { getClientCredentialsToken } from "../ml/auth.ts";
+import { getClientCredentialsToken, getRefreshTokenAccess } from "../ml/auth.ts";
 import { searchMl } from "../ml/search.ts";
 import {
   compareDeals,
@@ -55,18 +55,49 @@ async function collectMlDeals(config: BotConfig): Promise<Deal[]> {
     console.warn("[ml] ML_AFFILIATE_TAG não configurado — loja ML ignorada.");
     return [];
   }
-  // Tentativa B: emitir um token client_credentials e buscar autenticado.
-  // Se falhar, segue sem token (a busca pode devolver 403 em datacenter).
+  // Tentativa A: token do usuário via refresh_token — a busca
+  // /sites/MLB/search devolve 403 com o token client_credentials, porque
+  // o endpoint exige um token autorizado por um usuário (verificado em
+  // dry-run #42, 2026-11-26). O refresh_token dura 6 meses e pode ser
+  // reutilizado, mas cada refresh devolve um refresh_token novo: o bot
+  // NÃO o persiste (sem PAT não há como atualizar o secret), então
+  // apenas avisa no log — ver src/ml/auth.ts. O valor novo nunca é
+  // escrito em log ou arquivo.
   let accessToken: string | undefined;
-  if (config.mlClientId && config.mlClientSecret) {
+  if (config.mlRefreshToken && config.mlClientId && config.mlClientSecret) {
+    try {
+      const result = await getRefreshTokenAccess(
+        config.mlClientId,
+        config.mlClientSecret,
+        config.mlRefreshToken,
+      );
+      accessToken = result.accessToken;
+      console.log("[ml] token via refresh_token emitido.");
+      if (result.refreshTokenRotated) {
+        console.error(
+          "[ml] ATENÇÃO: o Mercado Livre devolveu um novo refresh_token. " +
+            "Atualize o secret ML_REFRESH_TOKEN no GitHub " +
+            "(paulolin63/ofertas-bot → Settings → Secrets → Actions) — o token " +
+            "antigo pode parar de funcionar. O novo valor NÃO foi salvo em nenhum lugar.",
+        );
+      }
+    } catch (error) {
+      console.error("[ml] token refresh_token falhou:", (error as Error).message);
+    }
+  }
+  // Tentativa B (fallback): token da aplicação (client_credentials).
+  // A busca com ele devolve 403 (testado 2026-11-26), mas o bot continua
+  // — as outras lojas não dependem do ML.
+  if (!accessToken && config.mlClientId && config.mlClientSecret) {
     try {
       accessToken = await getClientCredentialsToken(config.mlClientId, config.mlClientSecret);
       console.log("[ml] token client_credentials emitido.");
     } catch (error) {
       console.error("[ml] token client_credentials falhou:", (error as Error).message);
     }
-  } else {
-    console.warn("[ml] ML_CLIENT_ID/ML_CLIENT_SECRET não configurados — busca sem autenticação.");
+  }
+  if (!accessToken) {
+    console.warn("[ml] sem token ML — busca sem autenticação (pode devolver 403 em datacenter).");
   }
   const deals: Deal[] = [];
   for (const keyword of config.keywords) {
