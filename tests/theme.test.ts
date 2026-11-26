@@ -63,6 +63,7 @@ function config(partial: Partial<BotConfig> & { dataDir: string }): BotConfig {
     mlAffiliateLabel: "ofertas-bot",
     mlClientId: "",
     mlClientSecret: "",
+    mlRefreshToken: "",
     shopeeAppId: "",
     shopeeSecret: "",
     amazonAffiliateTag: "",
