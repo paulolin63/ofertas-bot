@@ -34,6 +34,8 @@ test("extractMlItemId extrai MLB de URLs comuns e gera hash para shortlinks", ()
   const shortId = extractMlItemId("https://mercadolivre.com/sec/1AbCdEf");
   assert.match(shortId, /^url-[0-9a-f]{12}$/);
   assert.equal(shortId, extractMlItemId("https://mercadolivre.com/sec/1AbCdEf"));
+  // Shortlink meli.la também não tem MLB na URL: chave por hash.
+  assert.match(extractMlItemId("https://meli.la/1gif4Nv"), /^url-[0-9a-f]{12}$/);
 });
 
 test("buildManualMlDeal gera link de afiliado, preserva /sec/ e rejeita domínio externo", () => {
@@ -62,6 +64,17 @@ test("buildManualMlDeal gera link de afiliado, preserva /sec/ e rejeita domínio
   });
   assert.equal(shortDeal.url, "https://mercadolivre.com/sec/2XYZabc");
   assert.equal(shortDeal.discountUnknown, true);
+
+  // Shortlink meli.la do gerador oficial também é aceito e preservado intacto.
+  const meliDeal = buildManualMlDeal({
+    url: "https://meli.la/1gif4Nv",
+    title: "Air Fryer Mondial",
+    price: "289,00",
+    affiliateTag: "",
+  });
+  assert.equal(meliDeal.url, "https://meli.la/1gif4Nv");
+  assert.match(meliDeal.key, /^ml:url-[0-9a-f]{12}$/);
+  assert.equal(meliDeal.discountUnknown, true);
 
   assert.throws(
     () =>
