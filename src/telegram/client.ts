@@ -3,6 +3,8 @@
  * O bot precisa ser administrador do canal. Sem dependências externas.
  */
 
+import { TELEGRAM_FETCH_TIMEOUT_MS, withTimeout } from "../http.ts";
+
 const API = "https://api.telegram.org";
 
 export interface TelegramResult {
@@ -16,11 +18,17 @@ async function callBotApi(
   body: Record<string, unknown>,
   fetchFn: typeof fetch = fetch,
 ): Promise<TelegramResult> {
-  const res = await fetchFn(`${API}/bot${token}/${method}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  const res = await fetchFn(
+    `${API}/bot${token}/${method}`,
+    withTimeout(
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      },
+      TELEGRAM_FETCH_TIMEOUT_MS,
+    ),
+  );
   const json = (await res.json()) as TelegramResult;
   if (!res.ok || !json.ok) {
     throw new Error(`Telegram ${method} falhou: ${json.description ?? res.status}`);

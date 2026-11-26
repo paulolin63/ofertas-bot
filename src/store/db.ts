@@ -44,6 +44,18 @@ export class PostedDb {
     return keys;
   }
 
+  /** Títulos de ofertas já postadas (exclui anúncios de tema, dicas de IA e brindes). */
+  postedDealTitles(): string[] {
+    const titles: string[] = [];
+    for (const [key, value] of Object.entries(this.data.posted)) {
+      if (key.startsWith("theme:") || key.startsWith("aitip:") || key.startsWith("freebie:")) {
+        continue;
+      }
+      if (value.title) titles.push(value.title);
+    }
+    return titles;
+  }
+
   mark(key: string, title: string): void {
     this.data.posted[key] = { at: new Date().toISOString(), title };
   }

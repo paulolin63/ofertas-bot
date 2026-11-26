@@ -1,11 +1,12 @@
 import { formatBrl } from "../config.ts";
 import type { Deal } from "../ml/deals.ts";
 
-function escapeHtml(text: string): string {
+export function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function truncate(text: string, max: number): string {
@@ -25,7 +26,11 @@ const STORE_LABEL: Record<Deal["store"], string> = {
 export function formatDealMessage(deal: Deal): string {
   const lines: string[] = [];
   const title = truncate(deal.title, 120);
-  lines.push(`🔥 <b>${deal.discountPct}% OFF</b> — ${escapeHtml(title)}`);
+  const badge =
+    !deal.discountUnknown && deal.discountPct > 0
+      ? `<b>${deal.discountPct}% OFF</b>`
+      : `<b>OFERTA</b>`;
+  lines.push(`🔥 ${badge} — ${escapeHtml(title)}`);
   lines.push("");
   if (deal.originalPrice && deal.originalPrice > deal.price) {
     lines.push(`💰 De <s>${formatBrl(deal.originalPrice)}</s> por <b>${formatBrl(deal.price)}</b>`);

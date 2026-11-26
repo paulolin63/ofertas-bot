@@ -26,6 +26,8 @@ export interface MlSearchResponse {
   paging?: { total: number };
 }
 
+import { withTimeout } from "../http.ts";
+
 const SEARCH_URL = "https://api.mercadolibre.com/sites/MLB/search";
 
 export async function searchMl(
@@ -40,7 +42,7 @@ export async function searchMl(
     "User-Agent": "ofertas-bot/0.1 (+https://github.com/paulolin63/ofertas-bot)",
   };
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
-  const res = await fetchFn(url, { headers });
+  const res = await fetchFn(url, withTimeout({ headers }));
   if (!res.ok) {
     throw new Error(`ML search falhou (${res.status}) para "${query}"`);
   }

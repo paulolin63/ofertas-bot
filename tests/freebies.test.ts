@@ -99,12 +99,24 @@ test("shortDescription corta no primeiro parágrafo e em 200 caracteres", () => 
   assert.equal(shortDescription("a".repeat(250)).length, 200);
 });
 
-test("translate: sucesso devolve o texto traduzido", async () => {
-  const out = await translateEnToPtBr(
-    "Free game for PC",
-    mockFetch({ responseData: { translatedText: "Jogo grátis para PC" } }),
-  );
+test("translate: sucesso devolve o texto traduzido e usa parâmetro de para email", async () => {
+  let seenUrl = "";
+  let seenSignal: AbortSignal | null | undefined;
+  const stubFetch = (async (url: string, init?: RequestInit) => {
+    seenUrl = url;
+    seenSignal = init?.signal;
+    return new Response(
+      JSON.stringify({ responseData: { translatedText: "Jogo grátis para PC" } }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+  }) as unknown as typeof fetch;
+
+  const out = await translateEnToPtBr("Free game for PC", stubFetch, "user@example.com");
   assert.equal(out, "Jogo grátis para PC");
+  const parsed = new URL(seenUrl);
+  assert.equal(parsed.searchParams.get("de"), "user@example.com");
+  assert.equal(parsed.searchParams.get("key"), null);
+  assert.ok(seenSignal instanceof AbortSignal);
 });
 
 test("translate: aviso de cota vira exceção", async () => {
@@ -145,6 +157,24 @@ test("formatFreebieMessage: grátis, valor riscado, prazo e sem afiliado", () =>
   assert.ok(text.includes("<s>R$ 39,99</s>"));
   assert.ok(text.includes("Até 19/11"));
   assert.ok(text.includes("sem link de afiliado"));
+});
+
+test("formatFreebieMessage: escapa HTML em título, descrição, valor e URL", () => {
+  const f: Freebie = {
+    source: "gamerpower",
+    key: "freebie:gp:99",
+    title: "Dungeons & Dragons <Special>",
+    description: 'Resgate <grátis> "hoje" & jogue!',
+    url: 'https://www.gamerpower.com/open/dd?a=1&b="2"',
+    imageUrl: null,
+    worth: "$9.99 <USD>",
+    endDate: null,
+  };
+  const text = formatFreebieMessage(f);
+  assert.ok(text.includes("Dungeons &amp; Dragons &lt;Special&gt;"));
+  assert.ok(text.includes("Resgate &lt;grátis&gt; &quot;hoje&quot; &amp; jogue!"));
+  assert.ok(text.includes("<s>$9.99 &lt;USD&gt;</s>"));
+  assert.ok(text.includes('href="https://www.gamerpower.com/open/dd?a=1&amp;b=&quot;2&quot;"'));
 });
 
 test("collectFreebies: epic entra direto, gamerpower traduzido", async () => {

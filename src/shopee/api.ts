@@ -13,6 +13,7 @@
  */
 
 import crypto from "node:crypto";
+import { withTimeout } from "../http.ts";
 
 export const SHOPEE_GRAPHQL_URL = "https://open-api.affiliate.shopee.com.br/graphql";
 
@@ -77,14 +78,17 @@ export async function searchProductOffers(
 }`;
   const payload = JSON.stringify({ query });
   const timestamp = Math.floor(Date.now() / 1000);
-  const res = await fetchFn(SHOPEE_GRAPHQL_URL, {
-    method: "POST",
-    headers: {
-      Authorization: buildAuthorization(opts.appId, opts.secret, payload, timestamp),
-      "Content-Type": "application/json",
-    },
-    body: payload,
-  });
+  const res = await fetchFn(
+    SHOPEE_GRAPHQL_URL,
+    withTimeout({
+      method: "POST",
+      headers: {
+        Authorization: buildAuthorization(opts.appId, opts.secret, payload, timestamp),
+        "Content-Type": "application/json",
+      },
+      body: payload,
+    }),
+  );
   if (!res.ok) throw new Error(`Shopee API falhou (${res.status})`);
   const json = (await res.json()) as ProductOfferResponse;
   if (json.errors?.length) {
@@ -107,14 +111,17 @@ export async function generateShortLink(
 }`;
   const payload = JSON.stringify({ query });
   const timestamp = Math.floor(Date.now() / 1000);
-  const res = await fetchFn(SHOPEE_GRAPHQL_URL, {
-    method: "POST",
-    headers: {
-      Authorization: buildAuthorization(opts.appId, opts.secret, payload, timestamp),
-      "Content-Type": "application/json",
-    },
-    body: payload,
-  });
+  const res = await fetchFn(
+    SHOPEE_GRAPHQL_URL,
+    withTimeout({
+      method: "POST",
+      headers: {
+        Authorization: buildAuthorization(opts.appId, opts.secret, payload, timestamp),
+        "Content-Type": "application/json",
+      },
+      body: payload,
+    }),
+  );
   if (!res.ok) throw new Error(`Shopee generateShortLink falhou (${res.status})`);
   const json = (await res.json()) as {
     data?: { generateShortLink?: { shortLink?: string } };

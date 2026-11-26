@@ -174,7 +174,7 @@ async function translateToTraditionalChinese(text: string): Promise<string> {
     url.searchParams.set("q", clean);
     url.searchParams.set("langpair", "en|zh-TW");
     const email = process.env.MYMEMORY_EMAIL?.trim();
-    if (email) url.searchParams.set("key", email);
+    if (email) url.searchParams.set("de", email);
     const response = await fetch(url, {
       headers: { "User-Agent": USER_AGENT },
       signal: AbortSignal.timeout(12_000),

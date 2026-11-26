@@ -50,3 +50,36 @@ test("variável numérica inválida usa o padrão", () => {
     assert.equal(loadConfig([]).freebieMaxPerRun, 3);
   });
 });
+
+test("variáveis de qualidade usam padrão quando vazias e respeitam valores definidos", () => {
+  withEnv(
+    {
+      DEAL_MIN_PRICE: "",
+      DEAL_MAX_DISCOUNT_PCT: "",
+      DEAL_MIN_RATING: "",
+      DEAL_MIN_SALES: "",
+    },
+    () => {
+      const cfg = loadConfig([]);
+      assert.equal(cfg.minPrice, 10);
+      assert.equal(cfg.maxDiscountPct, 85);
+      assert.equal(cfg.minRating, 4);
+      assert.equal(cfg.minSales, 10);
+    },
+  );
+  withEnv(
+    {
+      DEAL_MIN_PRICE: "25",
+      DEAL_MAX_DISCOUNT_PCT: "80",
+      DEAL_MIN_RATING: "4.5",
+      DEAL_MIN_SALES: "50",
+    },
+    () => {
+      const cfg = loadConfig([]);
+      assert.equal(cfg.minPrice, 25);
+      assert.equal(cfg.maxDiscountPct, 80);
+      assert.equal(cfg.minRating, 4.5);
+      assert.equal(cfg.minSales, 50);
+    },
+  );
+});

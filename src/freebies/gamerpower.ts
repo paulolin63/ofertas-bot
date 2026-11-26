@@ -32,6 +32,8 @@ interface GamerPowerItem {
   status?: string;
 }
 
+import { withTimeout } from "../http.ts";
+
 const GAMERPOWER_URL =
   "https://www.gamerpower.com/api/giveaways?platform=pc&type=game&sort-by=date";
 
@@ -62,9 +64,12 @@ export function gamerpowerItemToGiveaway(item: GamerPowerItem): GamerPowerGiveaw
 export async function fetchGamerPowerGiveaways(
   fetchFn: typeof fetch = fetch,
 ): Promise<GamerPowerGiveaway[]> {
-  const res = await fetchFn(GAMERPOWER_URL, {
-    headers: { "User-Agent": "ofertas-bot/0.1 (+https://github.com/paulolin63/ofertas-bot)" },
-  });
+  const res = await fetchFn(
+    GAMERPOWER_URL,
+    withTimeout({
+      headers: { "User-Agent": "ofertas-bot/0.1 (+https://github.com/paulolin63/ofertas-bot)" },
+    }),
+  );
   if (!res.ok) throw new Error(`GamerPower HTTP ${res.status}`);
   const items = (await res.json()) as GamerPowerItem[];
   if (!Array.isArray(items)) return [];
