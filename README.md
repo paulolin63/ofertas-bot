@@ -5,15 +5,15 @@ Bot de ofertas para Telegram: busca promoções no **Mercado Livre**, na **Shope
 ## Como funciona
 
 1. **Busca**:
-   - **Mercado Livre**: API pública (`api.mercadolibre.com/sites/MLB/search`) autenticada com `client_credentials` por execução (a busca sem auth devolve 403 em IPs de datacenter) + workflow semi-automático `.github/workflows/post-ml-deal.yml` para postar ofertas avulsas copiadas do navegador/app.
    - **Shopee**: Affiliate Open API GraphQL (`productOfferV2`).
-   - **Amazon**: **plano C via Firecrawl Cloud** (`src/amazon/firecrawl.ts`) com **cache diário por keyword em `data/amazon-cache.json`** (`src/amazon/cache.ts`, raspando cada keyword 1× ao dia em vez de 4×); sem `FIRECRAWL_API_KEY`, volta ao **plano B** (lista curada em `data/amazon-deals.json`).
+   - **Amazon**: **plano C via Firecrawl Cloud** (`src/amazon/firecrawl.ts`) com **cache diário por keyword em `data/amazon-cache.json`** (`src/amazon/cache.ts`, raspando cada keyword 1× ao dia em vez de 4×; resultados vazios não entram em cache para tentar novamente); sem `FIRECRAWL_API_KEY`, volta ao **plano B** (lista curada em `data/amazon-deals.json`).
+   - **Mercado Livre**: o endpoint `/sites/MLB/search` é bloqueado pelo PolicyAgent (`403 forbidden`) mesmo com OAuth de usuário válido; por isso o ML fica desativado na busca automática padrão (`DEAL_STORES=shopee,amazon`) e entra pelo workflow semi-automático `.github/workflows/post-ml-deal.yml` (aceita links do produto, `/sec/...` e `meli.la`).
    - **Brindes grátis**: Epic Games (API pública em PT-BR) e GamerPower (API pública traduzida para PT-BR via MyMemory).
 2. **Filtro, qualidade e deduplicação**:
    - Exige desconto entre `DEAL_MIN_DISCOUNT_PCT` (padrão 20%) e `DEAL_MAX_DISCOUNT_PCT` (padrão 85%, evitando descontos inflados), preço ≥ `DEAL_MIN_PRICE` (padrão R$ 10), avaliação ≥ `DEAL_MIN_RATING` (padrão 4.0, quando informada) e vendas ≥ `DEAL_MIN_SALES` (padrão 10, quando informadas).
    - Ofertas sem preço riscado (`discountUnknown`, comum na busca Amazon) são isentas do desconto mínimo e exibem o selo **OFERTA** em vez de `0% OFF`.
-   - Deduplicação de 30 dias em `data/posted.json` por **chave do item**, **chave de título** e **similaridade de título** (Jaccard/contenção de tokens em `src/store/titleKey.ts`), bloqueando o mesmo produto de vendedores diferentes mesmo com palavras reordenadas ou prefixos como "Kit"/"Promoção".
-3. **Rotação entre lojas**: as vagas de cada execução são intercaladas em round-robin entre ML, Shopee e Amazon, rotacionando a loja inicial por turno/dia (BRT) para nenhuma loja monopolizar o canal.
+   - Deduplicação de 30 dias em `data/posted.json` por **chave do item**, **chave de título** e **similaridade de título** (Jaccard/contenção de tokens em `src/store/titleKey.ts`, preservando números de modelo para não confundir versões distintas como Vivoactive 5 vs 6).
+3. **Rotação entre lojas**: as vagas de cada execução são intercaladas em round-robin entre as lojas ativas (`shopee` e `amazon` por padrão), rotacionando a loja inicial por turno/dia (BRT) para nenhuma loja monopolizar o canal.
 4. **Link de afiliado e post**: ML (`matt_tool`/`matt_word`), Shopee (`offerLink`), Amazon (`?tag=`). Foto + legenda HTML escapada no Telegram via Bot API, com timeout em todas as chamadas HTTP e selo "Link de afiliado".
 
 ## Uso local
@@ -49,7 +49,7 @@ npm start              # executa e posta de verdade
 | `DEAL_MIN_RATING` | não | Avaliação mínima quando informada pela loja (padrão 4.0) |
 | `DEAL_MIN_SALES` | não | Quantidade mínima de vendas quando informada (padrão 10) |
 | `DEAL_MAX_POSTS_PER_RUN` | não | Máx. de posts de ofertas por execução (padrão 5) |
-| `DEAL_STORES` | não | `ml,shopee,amazon` (padrão: as três) |
+| `DEAL_STORES` | não | Lojas na busca automática (padrão: `shopee,amazon`; ML entra via `post-ml-deal.yml`) |
 
 ## Amazon — plano C (Firecrawl + cache diário) e plano B (lista curada)
 

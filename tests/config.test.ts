@@ -83,3 +83,12 @@ test("variáveis de qualidade usam padrão quando vazias e respeitam valores def
     },
   );
 });
+
+test("DEAL_STORES usa shopee,amazon por padrão e aceita ml explícito", () => {
+  withEnv({ DEAL_STORES: "" }, () => {
+    assert.deepEqual(loadConfig([]).stores, ["shopee", "amazon"]);
+  });
+  withEnv({ DEAL_STORES: "ml,shopee,amazon" }, () => {
+    assert.deepEqual(loadConfig([]).stores, ["ml", "shopee", "amazon"]);
+  });
+});

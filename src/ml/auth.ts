@@ -35,6 +35,8 @@
  * client_credentials e depois para a busca sem autenticação.
  */
 
+import { withTimeout } from "../http.ts";
+
 const TOKEN_URL = "https://api.mercadolibre.com/oauth/token";
 
 export interface MlTokenResponse {
@@ -59,14 +61,17 @@ async function postToken(
   params: Record<string, string>,
   fetchFn: typeof fetch,
 ): Promise<MlTokenResponse> {
-  const res = await fetchFn(TOKEN_URL, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams(params).toString(),
-  });
+  const res = await fetchFn(
+    TOKEN_URL,
+    withTimeout({
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams(params).toString(),
+    }),
+  );
   if (!res.ok) {
     throw new Error(`ML token falhou (${res.status})`);
   }

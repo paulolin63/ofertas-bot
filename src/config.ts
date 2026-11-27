@@ -61,7 +61,11 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): BotConfig {
   const args = parseArgs(argv);
   const env = process.env;
 
-  const storesRaw = (args.stores ?? env.DEAL_STORES ?? "ml,shopee,amazon")
+  // O Mercado Livre bloqueia /sites/MLB/search com 403 (PolicyAgent) mesmo com
+  // token OAuth de usuário válido; por isso o padrão usa Shopee e Amazon, e o
+  // ML fica no workflow semi-automático `.github/workflows/post-ml-deal.yml`
+  // (quem quiser reativar a busca automática pode definir DEAL_STORES=ml,...).
+  const storesRaw = (args.stores ?? env.DEAL_STORES ?? "shopee,amazon")
     .split(",")
     .map((s) => s.trim().toLowerCase())
     .filter((s) => s === "ml" || s === "shopee" || s === "amazon") as Array<
@@ -124,7 +128,7 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): BotConfig {
       args.max !== undefined && Number.isFinite(args.max)
         ? args.max
         : num("DEAL_MAX_POSTS_PER_RUN", 5),
-    stores: storesRaw.length > 0 ? storesRaw : ["ml", "shopee", "amazon"],
+    stores: storesRaw.length > 0 ? storesRaw : ["shopee", "amazon"],
     dataDir: str("DATA_DIR", "./data"),
     dryRun: args.dryRun,
   };

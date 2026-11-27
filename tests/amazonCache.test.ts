@@ -151,3 +151,51 @@ test("collectAmazonWithCache invalida cache se o tracking tag mudar", async () =
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("collectAmazonWithCache não grava resultado vazio [], permitindo nova tentativa no mesmo dia", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ofertas-amz-cache-empty-"));
+  let attempt = 0;
+  const scrapeFn = async (_kw: string, _key: string, tag: string): Promise<Deal[]> => {
+    attempt += 1;
+    return attempt === 1 ? [] : [fakeDeal("B000000777", tag)];
+  };
+
+  try {
+    const first = await collectAmazonWithCache({
+      dataDir: dir,
+      keywords: ["capacete ciclismo"],
+      apiKey: "fc-key",
+      tag: "lin63-20",
+      now: new Date("2026-11-18T10:07:00-03:00"),
+      scrapeFn,
+    });
+    assert.equal(first.scraped, 1);
+    assert.equal(first.deals.length, 0);
+
+    const second = await collectAmazonWithCache({
+      dataDir: dir,
+      keywords: ["capacete ciclismo"],
+      apiKey: "fc-key",
+      tag: "lin63-20",
+      now: new Date("2026-11-18T13:07:00-03:00"),
+      scrapeFn,
+    });
+    assert.equal(second.cacheHits, 0);
+    assert.equal(second.scraped, 1);
+    assert.equal(second.deals.length, 1);
+
+    // Agora que retornou oferta, a 3ª execução vem do cache.
+    const third = await collectAmazonWithCache({
+      dataDir: dir,
+      keywords: ["capacete ciclismo"],
+      apiKey: "fc-key",
+      tag: "lin63-20",
+      now: new Date("2026-11-18T16:07:00-03:00"),
+      scrapeFn,
+    });
+    assert.equal(third.cacheHits, 1);
+    assert.equal(third.scraped, 0);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
