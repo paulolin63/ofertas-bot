@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-26T20:05:32.015Z",
+  "updatedAt": "2026-11-27T19:52:55.468Z",
   "delivered": [
     "https://bexx.io/post/swift-death-of-statelessness/",
     "https://gpu-demo-gallery.pages.dev/",
@@ -20,6 +20,9 @@
     "https://krebsonsecurity.com/2026/11/cto-of-ransomwarehelp-indicted-for-wire-fraud/",
     "https://techcrunch.com/2026/11/26/as-anthropic-ipos-grand-theft-auto-vi-proves-why-efficiency-isnt-a-virtue/",
     "https://huggingface.co/blog/ggml-org/llamacpp-amd-bench",
-    "https://huggingface.co/blog/nvidia/building-on-nemotron-35-parse-open-data-fine-tunin"
+    "https://huggingface.co/blog/nvidia/building-on-nemotron-35-parse-open-data-fine-tunin",
+    "https://twitter.com/michael_nielsen/status/2126359767362748777",
+    "https://github.com/openai/math/blob/main/preprints/Euclidean-geometry-in-the-asymptotic-spectrum-of-tensors-November-24-2026/paper.pdf",
+    "https://huggingface.co/blog/video-trainium3"
   ]
 }
