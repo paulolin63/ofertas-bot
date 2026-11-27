@@ -97,17 +97,21 @@ export async function collectAmazonWithCache(
     const k = normalizeKeyword(keyword);
     if (!k) continue;
     const cached = cache.byKeyword[k];
-    if (Array.isArray(cached)) {
+    if (Array.isArray(cached) && cached.length > 0) {
       deals.push(...cached);
       cacheHits += 1;
       continue;
     }
     try {
       const found = await scrape(keyword, opts.apiKey, opts.tag);
-      cache.byKeyword[k] = found;
       deals.push(...found);
       scraped += 1;
-      dirty = true;
+      // Não grava lista vazia no cache: páginas sem ofertas extraídas
+      // (bloqueio temporário/layout) tentam novamente na próxima execução.
+      if (found.length > 0) {
+        cache.byKeyword[k] = found;
+        dirty = true;
+      }
     } catch (error) {
       console.error(`[amazon] busca Firecrawl "${keyword}" falhou:`, (error as Error).message);
     }

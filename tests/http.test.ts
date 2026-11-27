@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { withTimeout } from "../src/http.ts";
-import { getClientCredentialsToken } from "../src/ml/auth.ts";
+import { getClientCredentialsToken, getRefreshTokenAccess } from "../src/ml/auth.ts";
 import { searchMl } from "../src/ml/search.ts";
 import { generateShortLink, searchProductOffers } from "../src/shopee/api.ts";
 import { scrapeAmazonSearch } from "../src/amazon/firecrawl.ts";
@@ -30,6 +30,7 @@ test("todas as chamadas HTTP externas passam AbortSignal de timeout", async () =
     }) as unknown as typeof fetch;
 
   await getClientCredentialsToken("id", "sec", makeStub({ access_token: "tok" }));
+  await getRefreshTokenAccess("id", "sec", "ref", makeStub({ access_token: "tok" }));
   await searchMl("fone", 10, makeStub({ results: [] }));
   await searchProductOffers(
     { appId: "1", secret: "s", keyword: "fone" },
@@ -49,7 +50,7 @@ test("todas as chamadas HTTP externas passam AbortSignal de timeout", async () =
   await fetchGamerPowerGiveaways(makeStub([]));
   await sendMessage("tok", "@canal", "teste", makeStub({ ok: true }));
 
-  assert.equal(signals.length, 8);
+  assert.equal(signals.length, 9);
   for (const sig of signals) {
     assert.ok(sig instanceof AbortSignal, "fetch precisa receber AbortSignal de timeout");
   }

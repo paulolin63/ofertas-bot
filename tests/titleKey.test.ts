@@ -61,3 +61,24 @@ test("isSimilarTitle não confunde produtos diferentes da mesma categoria", () =
   const gatinho = "Fone De Ouvido Bluetooth Orelha Gatinho Infantil Led Sem Fio";
   assert.equal(isSimilarTitle(m10, gatinho), false);
 });
+
+test("isSimilarTitle preserva números de modelo (ex.: Garmin Vivoactive 5 vs 6 e Forerunner)", () => {
+  const vivo5 = "Garmin Relógio Vivoactive 5 com Monitor Cardíaco de Pulso e GPS";
+  const vivo6 = "Garmin Relógio Vivoactive 6 com Monitor Cardíaco de Pulso e GPS";
+  const fr55 = "Garmin Relógio Forerunner 55 com Monitor Cardíaco de Pulso e GPS";
+  const fr165 =
+    "Garmin Relógio Forerunner 165 Music Preto com Cinza com Monitor Cardíaco de Pulso e GPS";
+  const instinct3 =
+    "Garmin Relógio Instinct 3 Solar Preto 45mm com Monitor Cardíaco de Pulso e GPS";
+  assert.equal(isSimilarTitle(vivo5, vivo6), false);
+  assert.equal(isSimilarTitle(vivo5, fr55), false);
+  assert.equal(isSimilarTitle(vivo5, fr165), false);
+  assert.equal(isSimilarTitle(vivo5, instinct3), false);
+
+  // Mesmo modelo em variação de cor continua sendo deduplicado.
+  const watch8a =
+    "Samsung Galaxy Watch8 Smartwatch 40mm BT, Galaxy AI, BioActive - Grafite";
+  const watch8b =
+    "Samsung Galaxy Watch8 Smartwatch 40mm BT, Galaxy AI, BioActive - Prata";
+  assert.equal(isSimilarTitle(watch8a, watch8b), true);
+});

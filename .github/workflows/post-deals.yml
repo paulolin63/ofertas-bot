@@ -1,17 +1,13 @@
 # Bot de ofertas — execução agendada (sem servidor).
 #
-# A API pública do Mercado Livre bloqueia IPs de datacenter: 403 nesta VM e
-# também nos runners do GitHub Actions (testado 2026-11-16, 5/5 keywords).
-# Tentativa A (em teste): token do usuário via refresh_token
-# (ML_REFRESH_TOKEN, secret — autorizado por PAULOCLARK em 2026-11-26).
-# A busca /sites/MLB/search devolve 403 com o token client_credentials,
-# porque o endpoint exige um token autorizado por um usuário (dry-run #42,
-# 2026-11-26). Fallback: client_credentials (ML_CLIENT_ID/ML_CLIENT_SECRET)
-# e depois busca sem autenticação — ver src/ml/auth.ts. O refresh_token
-# dura 6 meses e pode ser reutilizado, mas cada refresh devolve um novo:
-# o bot apenas avisa no log para atualizar o secret (sem PAT não há como
-# o workflow atualizar o secret sozinho). Para postar ofertas do ML
-# manualmente, use o workflow `.github/workflows/post-ml-deal.yml`.
+# A API `/sites/MLB/search` do Mercado Livre devolve 403 (`forbidden`,
+# PolicyAgent) mesmo com token OAuth de usuário válido via refresh_token
+# (confirmado em 2026-11-26, run #45915495126). Por isso o padrão de
+# `DEAL_STORES` é `shopee,amazon`, evitando 403 desnecessários e rotação
+# inútil do refresh token. Para postar ofertas do ML, use o workflow
+# semi-automático `.github/workflows/post-ml-deal.yml` (aceita links
+# mercadolivre.com.br, /sec/... e meli.la). Quem quiser testar a API do ML
+# pode definir a variable `DEAL_STORES=ml,shopee,amazon`.
 #
 # Segredos necessários no repositório (Settings → Secrets → Actions):
 #   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, ML_AFFILIATE_TAG,

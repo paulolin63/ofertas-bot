@@ -10,8 +10,9 @@
  * Além da chave exata das 8 primeiras palavras (`titleDedupKey`),
  * `isSimilarTitle` compara conjuntos de tokens relevantes (sem acentos,
  * stopwords nem termos genéricos de anúncio como "kit", "promoção",
- * "original") por Jaccard + contenção — pegando títulos reordenados ou
- * com prefixos/sufixos extras de keywords.
+ * "original") por Jaccard + contenção exata — preservando números de
+ * modelo (ex.: Vivoactive 5 vs Vivoactive 6, Forerunner 55 vs 165) para
+ * não confundir versões distintas da mesma linha de produtos.
  */
 
 const STOPWORDS = new Set([
@@ -62,6 +63,9 @@ const STOPWORDS = new Set([
   "unidades",
 ]);
 
+// Unidades/medidas (42mm, 220ml, 128gb) não identificam modelos distintos sozinhas.
+const UNIT_TOKEN_RE = /^\d+(?:mm|cm|m|ml|l|g|kg|gb|tb|mb|w|v|mah|hz|pol)$/;
+
 function normalizeWords(title: string): string[] {
   return title
     .normalize("NFD")
@@ -77,16 +81,34 @@ export function titleDedupKey(title: string): string {
   return `title:${normalized}`;
 }
 
-/** Tokens significativos do título (sem stopwords, 1-char ou dígitos isolados curtos). */
+/**
+ * Tokens significativos do título (sem stopwords nem quantidades do tipo
+ * "1/2/3", mas mantendo números de modelo como "5", "6", "55", "165", "520bt").
+ */
 export function titleTokens(title: string): Set<string> {
+  const cleaned = title
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\b\d+(?:\/\d+)+\b/g, " ") // remove prefixos de quantidade tipo 1/2/3
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
   const tokens = new Set<string>();
-  for (const word of normalizeWords(title)) {
-    if (word.length < 2) continue;
-    if (/^\d{1,2}$/.test(word)) continue; // ignora quantidades soltas como 1/2/3
+  for (const word of cleaned) {
     if (STOPWORDS.has(word)) continue;
+    if (word.length < 2 && !/^\d$/.test(word)) continue;
     tokens.add(word);
   }
   return tokens;
+}
+
+function modelNumberTokens(tokens: Set<string>): Set<string> {
+  const out = new Set<string>();
+  for (const token of tokens) {
+    if (/\d/.test(token) && !UNIT_TOKEN_RE.test(token)) out.add(token);
+  }
+  return out;
 }
 
 /** Similaridade de Jaccard entre dois títulos (0..1). */
@@ -107,17 +129,31 @@ export function titleSimilarity(
 
 /**
  * Verdadeiro quando dois títulos descrevem o mesmo produto (mesma chave
- * exata, Jaccard >= threshold, ou título curto quase todo contido no longo).
+ * exata, Jaccard >= threshold, ou todos os tokens do título curto contidos
+ * no longo). Se ambos os títulos citam números de modelo (ex.: Vivoactive 5
+ * vs 6, Forerunner 55 vs 165) e não compartilham nenhum, não são considerados
+ * iguais.
  */
 export function isSimilarTitle(
   a: string,
   b: string,
-  threshold = 0.6,
+  threshold = 0.7,
 ): boolean {
   if (titleDedupKey(a) === titleDedupKey(b)) return true;
   const setA = titleTokens(a);
   const setB = titleTokens(b);
   if (setA.size === 0 || setB.size === 0) return false;
+
+  const modA = modelNumberTokens(setA);
+  const modB = modelNumberTokens(setB);
+  if (modA.size > 0 && modB.size > 0) {
+    let sharedModel = 0;
+    for (const m of modA) {
+      if (modB.has(m)) sharedModel += 1;
+    }
+    if (sharedModel === 0) return false;
+  }
+
   let intersection = 0;
   for (const token of setA) {
     if (setB.has(token)) intersection += 1;
@@ -126,6 +162,5 @@ export function isSimilarTitle(
   const jaccard = union === 0 ? 0 : intersection / union;
   if (jaccard >= threshold) return true;
   const minSize = Math.min(setA.size, setB.size);
-  const overlap = intersection / minSize;
-  return minSize >= 4 && overlap >= 0.85;
+  return minSize >= 4 && intersection === minSize;
 }

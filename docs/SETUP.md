@@ -48,14 +48,12 @@ Secrets: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_NEWS_CHAT_ID` (p/ d
 
 Variables (opcional): `DEAL_KEYWORDS`, `DEAL_MIN_DISCOUNT_PCT`, `DEAL_MAX_DISCOUNT_PCT`, `DEAL_MIN_PRICE`, `DEAL_MIN_RATING`, `DEAL_MIN_SALES`, `DEAL_MAX_POSTS_PER_RUN`, `DEAL_STORES`, `ML_AFFILIATE_LABEL`, `FREEBIE_SOURCES`, `FREEBIE_MAX_PER_RUN`.
 
-### Aplicação do ML (`ML_CLIENT_ID` / `ML_CLIENT_SECRET`) e fluxo semi-automático
+### Mercado Livre — fluxo semi-automático (`post-ml-deal.yml`)
 
-A busca pública do ML devolve 403 em IPs de datacenter — testado na VM e nos runners do GitHub (2026-11-16) — e o Firecrawl recebe reCAPTCHA na busca do ML.
+O endpoint `/sites/MLB/search` do Mercado Livre retorna `403 forbidden` (PolicyAgent) mesmo com token OAuth de usuário válido (`refresh_token`), e o Firecrawl recebe reCAPTCHA na busca do ML. Por isso, o padrão de `DEAL_STORES` é `shopee,amazon` (evitando erros 403 e rotação inútil de refresh token nas execuções agendadas).
 
-1. Em [developers.mercadolivre.com.br](https://developers.mercadolivre.com.br/), logado na sua conta do ML, crie uma aplicação `ofertas-bot` (Redirect URL: `https://localhost:8080/callback`; scopes: read + offline_access).
-2. Anote o Client ID e o Secret Key e guarde-os como secrets `ML_CLIENT_ID` / `ML_CLIENT_SECRET` no repositório.
-3. Cada execução do bot emite um access_token (`client_credentials`, válido 6h) e o envia como Bearer na busca — ver `src/ml/auth.ts`.
-4. **Fluxo semi-automático (quando a busca via API continuar 403)**: em **Actions → `post-ml-deal` → Run workflow**, cole o link do produto (ou shortlink `/sec/...` ou `meli.la`), título, preço (ex.: `199,90`), preço original opcional e URL da foto opcional. O workflow gera o link de afiliado, checa duplicidade em `data/posted.json`, posta no Telegram e commita o histórico com `git pull --rebase`. Use `dry_run: true` para conferir a prévia antes de publicar.
+- **Como postar ofertas do ML**: em **Actions → `post-ml-deal` → Run workflow**, cole o link do produto (ou shortlink `/sec/...` ou `meli.la`), título, preço (ex.: `199,90`), preço original opcional e URL da foto opcional. O workflow gera o link de afiliado, checa duplicidade em `data/posted.json`, posta no Telegram e commita o histórico com `git pull --rebase`. Use `dry_run: true` para conferir a prévia antes de publicar.
+- **Reativar busca automática via API (opcional)**: caso sua conta receba acesso Partner liberado no DevCenter, defina a variable `DEAL_STORES=ml,shopee,amazon` junto aos secrets `ML_CLIENT_ID`, `ML_CLIENT_SECRET` e `ML_REFRESH_TOKEN`.
 
 ## 7. Testar antes de automatizar
 
